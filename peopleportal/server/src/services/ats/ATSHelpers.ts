@@ -38,6 +38,7 @@ export interface ATSSubteamConfigRequest {
     isRecruiting: boolean;
     roles: string[];
     roleSpecificQuestions: { [role: string]: string[] };
+    importantRequirementsByRole?: { role: string; text: string }[];
 }
 
 // Team-level application request with ordered role preferences

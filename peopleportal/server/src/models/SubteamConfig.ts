@@ -23,6 +23,7 @@ export interface ISubteamConfig extends Document {
     isRecruiting: boolean;
     roles: string[];
     roleSpecificQuestions: Record<string, string[]>; // role -> array of questions
+    importantRequirementsByRole?: { role: string; text: string }[];
 }
 
 const SubteamConfigSchema = new Schema<ISubteamConfig>(
@@ -34,6 +35,7 @@ const SubteamConfigSchema = new Schema<ISubteamConfig>(
             type: Schema.Types.Mixed,
             default: {},
         },
+        importantRequirementsByRole: { type: [{ _id: false, role: { type: String, required: true }, text: { type: String, maxlength: 500, trim: true } }], default: [] },
     },
     { timestamps: true },
 );

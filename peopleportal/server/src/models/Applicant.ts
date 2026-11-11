@@ -24,6 +24,7 @@ export interface IApplicant extends Document {
     fullName: string;
     profile: Map<string, string>; // Made required with default
     applicationIds: Types.ObjectId[];
+    // AI evaluations are stored by application/role in AutomatedEvaluation, not here.
     createdAt: Date;
     updatedAt: Date;
 }

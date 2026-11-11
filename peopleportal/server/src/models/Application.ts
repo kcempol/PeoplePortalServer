@@ -64,6 +64,7 @@ export interface IApplication extends Document {
     appDevInternalPk?: number;
     stars: number;
     notes?: string;
+    // Human feedback only. AutomatedEvaluation owns AI scores and evidence.
     pendingStageAction?: PendingStageAction;
 }
 

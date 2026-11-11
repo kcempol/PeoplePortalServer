@@ -41,6 +41,8 @@ import type { AuthorizedUser } from "../clients/OpenIdClient";
 import { ATSApplicantService } from "../services/ats/ATSApplicantService";
 import { ATSApplicationService } from "../services/ats/ATSApplicationService";
 import { ATSRecruitmentService } from "../services/ats/ATSRecruitmentService";
+import { ATSEvaluationService, type EvaluationRequest } from "../services/ats/ATSEvaluationService";
+import { productionEvaluationDependencies } from "../services/ats/ATSEvaluationRuntime";
 import type {
     ATSSubteamConfigRequest,
     ATSTeamApplicationRequest,
@@ -84,6 +86,46 @@ export class ATSController extends Controller {
 
     private get recruitment() {
         return new ATSRecruitmentService(this, this.authentikClient);
+    }
+
+    private get evaluations() {
+        return new ATSEvaluationService(this, productionEvaluationDependencies());
+    }
+
+    @Post("applications/{teamId}/{applicationId}/evaluation/all")
+    @Tags("Recruitment Actions")
+    @Security("bindles", ["corp:hiringaccess"])
+    @SuccessResponse(202)
+    async queueAllEvaluations(@Path() teamId: string, @Path() applicationId: string) {
+        return this.evaluations.queueAll(teamId, applicationId);
+    }
+
+    /** Staff-only experimental evaluation. No AI or résumé service is enabled yet. */
+    @Get("applications/{teamId}/{applicationId}/evaluation")
+    @Tags("Recruitment Actions")
+    @Security("bindles", ["corp:hiringaccess"])
+    @SuccessResponse(200)
+    async getEvaluation(@Path() teamId: string, @Path() applicationId: string,
+        @Query() subteamPk: string, @Query() jobTitle: string) {
+        return this.evaluations.get(teamId, applicationId, { subteamPk, jobTitle });
+    }
+
+    @Post("applications/{teamId}/{applicationId}/evaluation")
+    @Tags("Recruitment Actions")
+    @Security("bindles", ["corp:hiringaccess"])
+    @SuccessResponse(202)
+    async queueEvaluation(@Path() teamId: string, @Path() applicationId: string,
+        @Body() body: EvaluationRequest) {
+        return this.evaluations.queue(teamId, applicationId, body);
+    }
+
+    @Post("applications/{teamId}/{applicationId}/evaluation/retry")
+    @Tags("Recruitment Actions")
+    @Security("bindles", ["corp:hiringaccess"])
+    @SuccessResponse(202)
+    async retryEvaluation(@Path() teamId: string, @Path() applicationId: string,
+        @Body() body: EvaluationRequest) {
+        return this.evaluations.queue(teamId, applicationId, body, true);
     }
 
     /**

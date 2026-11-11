@@ -25,6 +25,7 @@ import { RedisClient } from "../../clients/RedisClient";
 import { SubteamConfig } from "../../models/SubteamConfig";
 import { TeamRecruitingStatus } from "../../models/TeamRecruitingStatus";
 import { Application, ApplicationStage } from "../../models/Application";
+import { AutomatedEvaluation } from "../../models/AutomatedEvaluation";
 import {
     CacheEnvelope,
     isCacheEnvelope,
@@ -94,7 +95,14 @@ export class ATSRecruitmentService {
         teamId: string,
         body: ATSSubteamConfigRequest,
     ) {
-        const { isRecruiting, roles, roleSpecificQuestions } = body;
+        const { isRecruiting, roles, roleSpecificQuestions, importantRequirementsByRole = [] } = body;
+
+        if (!Array.isArray(importantRequirementsByRole) ||
+            new Set(importantRequirementsByRole.map(item => item.role)).size !== importantRequirementsByRole.length ||
+            importantRequirementsByRole.some(item => !roles.includes(item.role) || typeof item.text !== "string" || item.text.length > 500)) {
+            this.response.setStatus(400);
+            return { error: "Bad Request", message: "Each role's important requirements must be 500 characters or less" };
+        }
 
         if (roles.length === 0) {
             this.response.setStatus(400);
@@ -104,6 +112,7 @@ export class ATSRecruitmentService {
             };
         }
 
+        const previousConfig = await SubteamConfig.findOne({ subteamPk: teamId }).lean().exec();
         // Use findOneAndUpdate with upsert to create or update
         const updatedConfig = await SubteamConfig.findOneAndUpdate(
             { subteamPk: teamId }, // filter
@@ -112,6 +121,7 @@ export class ATSRecruitmentService {
                 isRecruiting,
                 roles,
                 roleSpecificQuestions: roleSpecificQuestions || {},
+                importantRequirementsByRole: importantRequirementsByRole.map(item => ({ role: item.role, text: item.text.trim() })),
             }, // update data
             {
                 upsert: true, // Create if doesn't exist
@@ -121,6 +131,15 @@ export class ATSRecruitmentService {
         )
             .lean()
             .exec();
+
+        // A changed opening invalidates prior AI scores. Human stars/notes are untouched.
+        if (previousConfig && (JSON.stringify(previousConfig.roles) !== JSON.stringify(roles) ||
+            JSON.stringify(previousConfig.importantRequirementsByRole || []) !== JSON.stringify(importantRequirementsByRole))) {
+            await AutomatedEvaluation.updateMany(
+                { subteamPk: teamId, status: { $in: ["scored", "queued", "processing"] } },
+                { $set: { status: "stale", staleAt: new Date() }, $unset: { leaseToken: 1, leaseUntil: 1 } },
+            ).exec();
+        }
 
         // Keep the parent team's public recruitment status in sync with this subteam.
         const subteamInfo = await this.authentikClient.getGroupInfo(
