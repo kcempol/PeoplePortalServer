@@ -32,6 +32,7 @@ import { RegisterRoutes } from "./routes";
 import { apiReference } from "@scalar/express-api-reference";
 import { ValidateError } from "tsoa";
 import mongoose from "mongoose";
+import { startProductionEvaluationWorker } from "./services/ats/ATSEvaluationRuntime";
 import { OpenIdClient } from "./clients/OpenIdClient";
 import expressSession from "express-session";
 import { generateSecureRandomString } from "./utils/strings";
@@ -247,6 +248,9 @@ async function startup(): Promise<void> {
 
     // Agenda Client Singleton
     await agendaClient.initialize();
+    const stopScoringWorker = startProductionEvaluationWorker();
+    process.once("SIGTERM", stopScoringWorker);
+    process.once("SIGINT", stopScoringWorker);
 }
 
 app.listen(PORT, () => {

@@ -1049,6 +1049,36 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "EvaluationStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["queued"]},{"dataType":"enum","enums":["processing"]},{"dataType":"enum","enums":["scored"]},{"dataType":"enum","enums":["failed"]},{"dataType":"enum","enums":["stale"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CategoryKey": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["skills"]},{"dataType":"enum","enums":["projects"]},{"dataType":"enum","enums":["experience"]},{"dataType":"enum","enums":["outcomes"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "EvaluationCategory": {
+        "dataType": "refObject",
+        "properties": {
+            "key": {"ref":"CategoryKey","required":true},
+            "score": {"dataType":"double","required":true},
+            "explanation": {"dataType":"string","required":true},
+            "evidence": {"dataType":"array","array":{"dataType":"string"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "EvaluationRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "subteamPk": {"dataType":"string","required":true},
+            "jobTitle": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "Fields": {
         "dataType": "refAlias",
         "type": {"ref":"Record_string.string_","validators":{}},
@@ -1065,6 +1095,7 @@ const models: TsoaRoute.Models = {
             "isRecruiting": {"dataType":"boolean","required":true},
             "roles": {"dataType":"array","array":{"dataType":"string"},"required":true},
             "roleSpecificQuestions": {"dataType":"nestedObjectLiteral","nestedProperties":{},"additionalProperties":{"dataType":"array","array":{"dataType":"string"}},"required":true},
+            "importantRequirementsByRole": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"text":{"dataType":"string","required":true},"role":{"dataType":"string","required":true}}}},
         },
         "additionalProperties": false,
     },
@@ -3495,6 +3526,138 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsATSController_queueAllEvaluations: Record<string, TsoaRoute.ParameterSchema> = {
+                teamId: {"in":"path","name":"teamId","required":true,"dataType":"string"},
+                applicationId: {"in":"path","name":"applicationId","required":true,"dataType":"string"},
+        };
+        app.post('/api/ats/applications/:teamId/:applicationId/evaluation/all',
+            authenticateMiddleware([{"bindles":["corp:hiringaccess"]}]),
+            ...(fetchMiddlewares<RequestHandler>(ATSController)),
+            ...(fetchMiddlewares<RequestHandler>(ATSController.prototype.queueAllEvaluations)),
+
+            async function ATSController_queueAllEvaluations(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsATSController_queueAllEvaluations, request, response });
+
+                const controller = new ATSController();
+
+              await templateService.apiHandler({
+                methodName: 'queueAllEvaluations',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsATSController_getEvaluation: Record<string, TsoaRoute.ParameterSchema> = {
+                teamId: {"in":"path","name":"teamId","required":true,"dataType":"string"},
+                applicationId: {"in":"path","name":"applicationId","required":true,"dataType":"string"},
+                subteamPk: {"in":"query","name":"subteamPk","required":true,"dataType":"string"},
+                jobTitle: {"in":"query","name":"jobTitle","required":true,"dataType":"string"},
+        };
+        app.get('/api/ats/applications/:teamId/:applicationId/evaluation',
+            authenticateMiddleware([{"bindles":["corp:hiringaccess"]}]),
+            ...(fetchMiddlewares<RequestHandler>(ATSController)),
+            ...(fetchMiddlewares<RequestHandler>(ATSController.prototype.getEvaluation)),
+
+            async function ATSController_getEvaluation(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsATSController_getEvaluation, request, response });
+
+                const controller = new ATSController();
+
+              await templateService.apiHandler({
+                methodName: 'getEvaluation',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsATSController_queueEvaluation: Record<string, TsoaRoute.ParameterSchema> = {
+                teamId: {"in":"path","name":"teamId","required":true,"dataType":"string"},
+                applicationId: {"in":"path","name":"applicationId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"EvaluationRequest"},
+        };
+        app.post('/api/ats/applications/:teamId/:applicationId/evaluation',
+            authenticateMiddleware([{"bindles":["corp:hiringaccess"]}]),
+            ...(fetchMiddlewares<RequestHandler>(ATSController)),
+            ...(fetchMiddlewares<RequestHandler>(ATSController.prototype.queueEvaluation)),
+
+            async function ATSController_queueEvaluation(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsATSController_queueEvaluation, request, response });
+
+                const controller = new ATSController();
+
+              await templateService.apiHandler({
+                methodName: 'queueEvaluation',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsATSController_retryEvaluation: Record<string, TsoaRoute.ParameterSchema> = {
+                teamId: {"in":"path","name":"teamId","required":true,"dataType":"string"},
+                applicationId: {"in":"path","name":"applicationId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"EvaluationRequest"},
+        };
+        app.post('/api/ats/applications/:teamId/:applicationId/evaluation/retry',
+            authenticateMiddleware([{"bindles":["corp:hiringaccess"]}]),
+            ...(fetchMiddlewares<RequestHandler>(ATSController)),
+            ...(fetchMiddlewares<RequestHandler>(ATSController.prototype.retryEvaluation)),
+
+            async function ATSController_retryEvaluation(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsATSController_retryEvaluation, request, response });
+
+                const controller = new ATSController();
+
+              await templateService.apiHandler({
+                methodName: 'retryEvaluation',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
               });
             } catch (err) {
                 return next(err);
