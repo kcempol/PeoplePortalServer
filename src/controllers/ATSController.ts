@@ -116,6 +116,17 @@ const MAX_RESPONSE_LENGTH = 2000;
 const MAX_WHY_APPDEV_WORDS = 200;
 const MIN_RESPONSE_WORDS = 10;
 
+/**
+ * True if an applicant-supplied resume key belongs to that applicant: either
+ * their working resume `resumes/<applicantId>.pdf` (what the upload endpoint
+ * issues) or a key under their own `resumes/<applicantId>/` prefix (older
+ * uploads used `resumes/<applicantId>/<timestamp>.pdf`). S3 keys are literal
+ * strings, so a `..` segment cannot escape the prefix.
+ */
+function isOwnResumeKey(applicantId: string, key: string): boolean {
+    return key === `resumes/${applicantId}.pdf` || key.startsWith(`resumes/${applicantId}/`);
+}
+
 @Route("/api/ats")
 export class ATSController extends Controller {
     private readonly authentikClient: AuthentikClient;
@@ -1283,6 +1294,20 @@ export class ATSController extends Controller {
                 }
             }
 
+            // 8.1 The resume must be the applicant's own upload. Without this, an
+            //     applicant could submit another applicant's S3 key: it would be
+            //     copied into their application (and deleted if not a valid PDF).
+            if (!applicant) {
+                /* Created at OTP verification and required to upload a resume */
+                this.setStatus(404);
+                return { error: "ApplicantNotFound", message: "Applicant not found" };
+            }
+
+            if (!isOwnResumeKey(applicant._id.toString(), profile.resumeUrl)) {
+                this.setStatus(403);
+                return { error: "InvalidResume", message: "The resume must be one you uploaded." };
+            }
+
             // 9. Validate Resume Signature (before any writes, so an invalid
             //    file can never overwrite the applicant's stored profile)
             try {
@@ -1307,12 +1332,6 @@ export class ATSController extends Controller {
             //       working resume (profile.resumeUrl) is overwritten on every upload,
             //       so reviewers read this per-application copy instead. The hash of
             //       the copy is the ResumeScore cache key.
-            if (!applicant) {
-                /* Created at OTP verification and required to upload a resume */
-                this.setStatus(404);
-                return { error: "ApplicantNotFound", message: "Applicant not found" };
-            }
-
             const applicationId = new Types.ObjectId();
             const resumeKey = `resumes/${applicant._id}/${applicationId}.pdf`;
             let resumeHash: string;
@@ -1433,6 +1452,12 @@ export class ATSController extends Controller {
 
             // Immediate Signature Validation for new Resume Uploads
             if (body.resumeUrl && body.resumeUrl !== currentProfile.resumeUrl) {
+                // A new resume must be the applicant's own upload (see isOwnResumeKey)
+                if (!isOwnResumeKey(applicant._id.toString(), body.resumeUrl)) {
+                    this.setStatus(403);
+                    return { error: "InvalidResume", message: "The resume must be one you uploaded." };
+                }
+
                 const isValid = await validateS3FileSignature(body.resumeUrl, [FILE_SIGNATURES.PDF]);
                 if (!isValid) {
                     // Cleanup invalid file
