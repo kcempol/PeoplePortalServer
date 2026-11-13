@@ -36,7 +36,7 @@ import { OrgController } from "./OrgController";
 import { AuthorizedUser } from "../clients/OpenIdClient";
 import { validateS3FileSignature, FILE_SIGNATURES, copyS3Object, getS3ObjectSha256 } from '../utils/s3-validation';
 import { Types } from "mongoose";
-import { scoreApplication } from "../scoring/scoreApplication";
+import { scoreApplication, getScoresForApplication, ApplicationRoleScore } from "../scoring/scoreApplication";
 import MarkdownIt from "markdown-it";
 
 // ====================
@@ -83,7 +83,21 @@ interface ATSKanbanApplicationCard {
 
 interface ATSApplicationDetails extends ATSKanbanApplicationCard {
     email: string;
+
+    /**
+     * Applicant profile (resumeUrl, whyAppDev, links, ...) as submitted with
+     * this application. Applications created before profile snapshots existed
+     * return the applicant's current profile instead.
+     */
     profile: Record<string, string>;
+
+    /**
+     * ATS resume scores for the roles applied for, one entry per role
+     * preference in preference order. Roles not on the scoring position list
+     * use the `Default` score; entries are `pending` until background scoring
+     * finishes. Empty for applications that predate per-application resumes.
+     */
+    scores: ApplicationRoleScore[];
     responses: Record<string, string>;
     stageHistory?: {
         stage: ApplicationStage;
@@ -577,8 +591,13 @@ export class ATSController extends Controller {
     /**
      * Fetches all information about an application including, preferred roles,
      * responses to role specific questions and the application stage history.
-     * To perform this action, the user must either be a Team Owner or hold 
+     * To perform this action, the user must either be a Team Owner or hold
      * the `corp:hiringaccess` bindle.
+     *
+     * `profile` is the profile as submitted with this application (falling back to
+     * the applicant's current profile for older applications). `scores` holds the ATS
+     * resume scores for only the roles applied for, although every resume is scored
+     * against all positions.
      * 
      * @param teamId People Portal Team ID
      * @param applicationId Application ID
@@ -611,7 +630,8 @@ export class ATSController extends Controller {
                 stars: app.stars || 0,
 
                 // Detailed fields
-                profile: app.applicantId.profile as any,
+                profile: (app.profileSnapshot ?? app.applicantId.profile) as any,
+                scores: await getScoresForApplication(app),
                 responses: app.responses as any,
                 stageHistory: app.stageHistory,
                 ...(app.notes ? { notes: app.notes } : {}),

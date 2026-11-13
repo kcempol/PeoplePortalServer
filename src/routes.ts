@@ -681,6 +681,24 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "Record_string.number_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{},"additionalProperties":{"dataType":"double"},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApplicationRoleScore": {
+        "dataType": "refObject",
+        "properties": {
+            "role": {"dataType":"string","required":true},
+            "position": {"dataType":"string","required":true},
+            "score": {"dataType":"double","validators":{"minimum":{"value":0},"maximum":{"value":100}}},
+            "breakdown": {"ref":"Record_string.number_"},
+            "scoringVersion": {"dataType":"string","required":true},
+            "pending": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ATSApplicationDetails": {
         "dataType": "refObject",
         "properties": {
@@ -693,6 +711,7 @@ const models: TsoaRoute.Models = {
             "stars": {"dataType":"double","required":true,"validators":{"minimum":{"errorMsg":"Minimum Stars is 0","value":0},"maximum":{"errorMsg":"Maximum Stars is 5","value":5}}},
             "email": {"dataType":"string","required":true},
             "profile": {"ref":"Record_string.string_","required":true},
+            "scores": {"dataType":"array","array":{"dataType":"refObject","ref":"ApplicationRoleScore"},"required":true},
             "responses": {"ref":"Record_string.string_","required":true},
             "stageHistory": {"dataType":"array","array":{"dataType":"nestedObjectLiteral","nestedProperties":{"changedBy":{"dataType":"string"},"changedAt":{"dataType":"datetime","required":true},"stage":{"ref":"ApplicationStage","required":true}}}},
             "hiredRole": {"dataType":"string"},
