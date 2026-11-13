@@ -34,7 +34,8 @@ import { Query } from "tsoa";
 import { EmailClient } from "../clients/EmailClient";
 import { OrgController } from "./OrgController";
 import { AuthorizedUser } from "../clients/OpenIdClient";
-import { validateS3FileSignature, FILE_SIGNATURES } from '../utils/s3-validation';
+import { validateS3FileSignature, FILE_SIGNATURES, copyS3Object, getS3ObjectSha256 } from '../utils/s3-validation';
+import { Types } from "mongoose";
 import MarkdownIt from "markdown-it";
 
 // ====================
@@ -1047,11 +1048,18 @@ export class ATSController extends Controller {
      * to a team that's currently recruiting. For access to this API, the user must be 
      * authenticated via the Guest Authorization Layer.
      * 
-     * This handler performs basic request and session validation, verifies that the team exists 
-     * and is actively recruiting, validates the user’s selected roles and profile information, 
-     * checks required application questions and responses, prevents duplicate applications, 
-     * updates or creates the applicant record, sets attributes for existing internal members, 
-     * and finally creates a new application.
+     * This handler performs basic request and session validation, verifies that the team exists
+     * and is actively recruiting, validates the user’s selected roles and profile information,
+     * checks required application questions and responses, prevents duplicate applications,
+     * verifies the uploaded resume is a real PDF (before anything is written), updates or
+     * creates the applicant record, sets attributes for existing internal members, and finally
+     * creates a new application.
+     *
+     * Each application keeps what was submitted with it, independent of later applications:
+     * - The resume is copied to `resumes/<applicantId>/<applicationId>.pdf` (`resumeKey`), and
+     *   the SHA-256 of that copy is stored as `resumeHash`.
+     * - The submitted profile is stored as `profileSnapshot`. The applicant's own profile
+     *   remains a working copy that is replaced on every apply.
      * 
      * @param body Team Application Request
      * @param request Express Request Object
@@ -1250,6 +1258,28 @@ export class ATSController extends Controller {
                 return { error: "FileProcessingError", message: "Failed to process resume file." };
             }
 
+            // 9.0.1 Give this application its own copy of the resume. The applicant's
+            //       working resume (profile.resumeUrl) is overwritten on every upload,
+            //       so reviewers read this per-application copy instead. The hash of
+            //       the copy is the ResumeScore cache key.
+            if (!applicant) {
+                /* Created at OTP verification and required to upload a resume */
+                this.setStatus(404);
+                return { error: "ApplicantNotFound", message: "Applicant not found" };
+            }
+
+            const applicationId = new Types.ObjectId();
+            const resumeKey = `resumes/${applicant._id}/${applicationId}.pdf`;
+            let resumeHash: string;
+            try {
+                await copyS3Object(profile.resumeUrl, resumeKey);
+                resumeHash = await getS3ObjectSha256(resumeKey);
+            } catch (e) {
+                console.error("Failed to copy or hash resume", e);
+                this.setStatus(500);
+                return { error: "FileProcessingError", message: "Failed to process resume file." };
+            }
+
             // 9.1 Create/update applicant
             const updatedApplicant = await Applicant.findOneAndUpdate(
                 { email: userEmail },
@@ -1273,20 +1303,33 @@ export class ATSController extends Controller {
                 /* Not previously in App Dev */
             }
 
-            // 10. Create application with ordered role preferences
-            const application = await Application.create({
-                applicantId: updatedApplicant._id,
-                teamPk: teamPk,
-                rolePreferences: rolePreferences,  // Ordered array of roles
-                stage: ApplicationStage.APPLIED,
-                responses: new Map(Object.entries(responses)),
-                appliedAt: new Date(),
-                appDevInternalPk,
-                stageHistory: [{
+            // 10. Create application with ordered role preferences, its own resume
+            //     copy and a snapshot of the profile as submitted
+            let application: IApplication;
+            try {
+                application = await Application.create({
+                    _id: applicationId,
+                    applicantId: updatedApplicant._id,
+                    teamPk: teamPk,
+                    rolePreferences: rolePreferences,  // Ordered array of roles
                     stage: ApplicationStage.APPLIED,
-                    changedAt: new Date()
-                }]
-            });
+                    responses: new Map(Object.entries(responses)),
+                    appliedAt: new Date(),
+                    appDevInternalPk,
+                    resumeKey,
+                    resumeHash,
+                    profileSnapshot: new Map(Object.entries(profile)),
+                    stageHistory: [{
+                        stage: ApplicationStage.APPLIED,
+                        changedAt: new Date()
+                    }]
+                });
+            } catch (e) {
+                /* Don't leave an orphaned resume copy behind */
+                await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: resumeKey }))
+                    .catch(err => console.error("Failed to delete orphaned resume copy", err));
+                throw e;
+            }
 
             await Applicant.findByIdAndUpdate(
                 updatedApplicant._id,
