@@ -129,7 +129,9 @@ schema/index deployment and storage immutability still require approved staging.
 | `b35e66f` | Evidence and privacy boundary |
 | `73e6e15` | Bounded reconciliation and graceful drain |
 | `97bb452` | UI error/poll recovery |
+| `de22106` | Final audit fixes, v4 context preparation and staging documentation |
 
-The final audit-fix commit follows these entries (`git log --oneline` identifies
-it). Revert newest-first through this list, stopping before base `a140102`.
+The final documentation-only commit adds this completed index. Roll back that HEAD
+first if desired, then `de22106`, `97bb452`, `73e6e15`, `b35e66f`, `83a11ba`,
+`68bb6b5`, stopping before base `a140102`.
 The checkpoint and teammate history are retained; nothing was pushed or deployed.
