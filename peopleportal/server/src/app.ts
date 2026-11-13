@@ -32,7 +32,7 @@ import { RegisterRoutes } from "./routes";
 import { apiReference } from "@scalar/express-api-reference";
 import { ValidateError } from "tsoa";
 import mongoose from "mongoose";
-import { startProductionEvaluationWorker } from "./services/ats/ATSEvaluationRuntime";
+import { startProductionEvaluationWorker, startProductionEvaluationReconciler } from "./services/ats/ATSEvaluationSetup";
 import { OpenIdClient } from "./clients/OpenIdClient";
 import expressSession from "express-session";
 import { generateSecureRandomString } from "./utils/strings";
@@ -46,6 +46,7 @@ import log from "loglevel";
 import { agendaClient } from "./clients/AgendaClient";
 import { authenticateGiteaWebhook } from "./utils/gitea-webhook-auth";
 import { describeUnknownError } from "./utils/errors";
+import { createShutdown } from "./utils/graceful-shutdown";
 
 log.setLevel("info");
 
@@ -249,11 +250,21 @@ async function startup(): Promise<void> {
     // Agenda Client Singleton
     await agendaClient.initialize();
     const stopScoringWorker = startProductionEvaluationWorker();
-    process.once("SIGTERM", stopScoringWorker);
-    process.once("SIGINT", stopScoringWorker);
+    const stopReconciler = startProductionEvaluationReconciler();
+    const shutdown = createShutdown(
+        () => new Promise<void>(resolve => { server.close(() => resolve()); }),
+        async () => { await Promise.all([stopReconciler(), stopScoringWorker()]); },
+        async () => { await agendaClient.stop(); await RedisClient.disconnect(); await mongoose.disconnect(); },
+    );
+    const stop = () => { void shutdown().then(clean => {
+        if (!clean) server.closeAllConnections();
+        process.exit(clean ? 0 : 1);
+    }); };
+    process.once("SIGTERM", stop);
+    process.once("SIGINT", stop);
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     startup().catch((e: unknown) => {
         /* Reaching here means a dependency the server cannot serve without (OIDC
        discovery, Redis, Mongo, the job scheduler) did not come up. Exit

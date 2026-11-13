@@ -1,8 +1,9 @@
+import { CATEGORY_KEYS, EVALUATION_STATUSES } from "../services/ats/ATSEvaluationTypes";
 import { Document, Schema, Types, model } from "mongoose";
 
 export const EVALUATION_LABEL = "Experimental title-based score.";
-export type EvaluationStatus = "queued" | "processing" | "scored" | "failed" | "stale";
-export type CategoryKey = "skills" | "projects" | "experience" | "outcomes";
+export type EvaluationStatus = typeof EVALUATION_STATUSES[number];
+export type CategoryKey = typeof CATEGORY_KEYS[number];
 
 export interface EvaluationCategory {
     key: CategoryKey;
@@ -24,6 +25,9 @@ export interface IAutomatedEvaluation extends Document {
     categories?: EvaluationCategory[];
     explanation?: string;
     resumeContentHash?: string;
+    snapshotHash?: string;
+    contextKey?: string;
+    revision?: number;
     rubricVersion: string;
     modelVersion: string;
     promptVersion: string;
@@ -42,7 +46,7 @@ export interface IAutomatedEvaluation extends Document {
 }
 
 const CategorySchema = new Schema<EvaluationCategory>({
-    key: { type: String, enum: ["skills", "projects", "experience", "outcomes"], required: true },
+    key: { type: String, enum: CATEGORY_KEYS, required: true },
     score: { type: Number, min: 0, max: 100, required: true },
     explanation: { type: String, required: true },
     evidence: { type: [String], default: [] },
@@ -56,11 +60,14 @@ const AutomatedEvaluationSchema = new Schema<IAutomatedEvaluation>({
     jobTitle: { type: String, required: true },
     importantRequirements: { type: String, maxlength: 500 },
     inferredJobFocus: String,
-    status: { type: String, enum: ["queued", "processing", "scored", "failed", "stale"], required: true },
+    status: { type: String, enum: EVALUATION_STATUSES, required: true },
     overallScore: { type: Number, min: 0, max: 100 },
     categories: [CategorySchema],
     explanation: String,
     resumeContentHash: String,
+    snapshotHash: String,
+    contextKey: String,
+    revision: { type: Number, default: 0 },
     rubricVersion: { type: String, required: true },
     modelVersion: { type: String, required: true },
     promptVersion: { type: String, required: true },

@@ -139,7 +139,8 @@ export class ATSApplicationService {
                 stars: app.stars || 0,
 
                 // Detailed fields
-                profile: app.applicantId.profile as any,
+                profile: (app.profileSnapshot ?? app.applicantId.profile) as any,
+                scores: [], // Legacy ResumeScore cache is not an authoritative application evaluation.
                 responses: app.responses as any,
                 stageHistory: app.stageHistory,
                 ...(app.notes ? { notes: app.notes } : {}),

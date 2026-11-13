@@ -30,6 +30,9 @@ import {
 import { Application, ApplicationStage } from "../../models/Application";
 import { SubteamConfig } from "../../models/SubteamConfig";
 import { TeamRecruitingStatus } from "../../models/TeamRecruitingStatus";
+import { queueSubmittedApplication } from "./SubmissionEvaluationQueue";
+import { SUBMISSION_QUEUE_TIMEOUT_MS, scoringEvent } from "./ATSEvaluationTypes";
+import { copyS3Object, getS3ObjectSha256 } from "../../utils/s3-validation";
 import { s3Client, BUCKET_NAME } from "../../clients/AWSClient/S3Client";
 import {
     ATSResponse,
@@ -49,6 +52,7 @@ export class ATSApplicantService {
     constructor(
         private readonly response: ATSResponse,
         private readonly authentikClient: AuthentikClient,
+        private readonly queueEvaluations: typeof queueSubmittedApplication = queueSubmittedApplication,
     ) {}
 
     async getResumeUploadUrl(
@@ -148,7 +152,7 @@ export class ATSApplicantService {
             this.response.setHeader("Location", downloadUrl);
             return;
         } catch (error) {
-            console.error("Error generating download URL:", error);
+            console.warn("[ats] resume_download_failed");
             this.response.setStatus(404);
             return {
                 error: "NotFound",
@@ -271,7 +275,7 @@ export class ATSApplicantService {
                 );
                 if (resumeError) return resumeError;
             } catch (e) {
-                console.error("Failed to validate resume", e);
+                console.warn("[ats] resume_validation_failed");
                 this.response.setStatus(500);
                 return {
                     error: "FileProcessingError",
@@ -289,6 +293,17 @@ export class ATSApplicantService {
                     userEmail.split("@")[0]!,
             );
 
+            // Submission is already committed. Queue metadata only; the worker scores later.
+            try {
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                try {
+                    await Promise.race([this.queueEvaluations(application), new Promise<void>(resolve => {
+                        timer = setTimeout(() => { scoringEvent("queue_timeout"); resolve(); }, SUBMISSION_QUEUE_TIMEOUT_MS);
+                    })]);
+                } finally { if (timer) clearTimeout(timer); }
+            } catch {
+                // Scoring configuration/queue failures must not turn an accepted application into an error.
+            }
             return {
                 message: "Application submitted successfully",
                 id: application._id,
@@ -313,7 +328,7 @@ export class ATSApplicantService {
                     message: "You have already applied to this team.",
                 };
             }
-            console.error("Application submission error:", err);
+            console.warn("[ats] application_submission_failed");
             this.response.setStatus(500);
             return {
                 error: "ServerError",
@@ -373,7 +388,7 @@ export class ATSApplicantService {
 
             return { message: "Profile updated successfully" };
         } catch (err) {
-            console.error("Error updating profile:", err);
+            console.warn("[ats] profile_update_failed");
             this.response.setStatus(500);
             return {
                 error: "ServerError",
@@ -467,7 +482,14 @@ export class ATSApplicantService {
         // the profile, application link, and application as one unit. The unique
         // applicant/team index also resolves simultaneous duplicate submissions.
         const applicationId = new Types.ObjectId();
-        return Applicant.db.transaction(async (session) => {
+        const resumeKey = `resumes/${applicant._id}/${applicationId}.pdf`;
+        // Validate the copied bytes too: the working upload can change between validation and copy.
+        try {
+        await copyS3Object(input.profile.resumeUrl, resumeKey);
+        const snapshotError = await verifyApplicantResume(applicant._id, resumeKey, this.response, applicationId);
+        if (snapshotError) throw new Error("Invalid snapshot");
+        const resumeHash = await getS3ObjectSha256(resumeKey);
+        return await Applicant.db.transaction(async (session) => {
             const updatedApplicant = await Applicant.findByIdAndUpdate(
                 applicant._id,
                 {
@@ -488,6 +510,9 @@ export class ATSApplicantService {
                         _id: applicationId,
                         applicantId: applicant._id,
                         teamPk: input.teamPk,
+                        resumeKey,
+                        resumeHash,
+                        profileSnapshot: new Map(Object.entries({ ...input.profile, submittedFullName: fullName })),
                         rolePreferences: input.rolePreferences,
                         stage: ApplicationStage.APPLIED,
                         responses: new Map(Object.entries(input.responses)),
@@ -506,6 +531,11 @@ export class ATSApplicantService {
             if (!application) throw new Error("Application was not created");
             return application;
         });
+        } catch (error) {
+            // A rejected commit may have succeeded remotely. Never delete its snapshot.
+            // Unique unreferenced copies are retained for separately approved orphan cleanup.
+            throw error;
+        }
     }
 }
 

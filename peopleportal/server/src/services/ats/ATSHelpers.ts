@@ -126,8 +126,10 @@ export async function verifyApplicantResume(
     applicantId: unknown,
     key: string,
     response: ATSResponse,
+    applicationId?: unknown,
 ) {
-    if (!isApplicantResumeKey(applicantId, key)) {
+    const owned = applicationId ? key === `resumes/${applicantId}/${applicationId}.pdf` : isApplicantResumeKey(applicantId, key);
+    if (!owned) {
         response.setStatus(400);
         return { error: "InvalidResumeKey", message: "Invalid resume upload." };
     }

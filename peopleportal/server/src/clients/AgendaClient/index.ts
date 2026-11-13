@@ -78,6 +78,10 @@ export class AgendaClient {
     public async cancelJob(jobName: string, jobData: object) {
         await this.agenda!.cancel({ name: jobName, data: jobData });
     }
+
+    public async stop(): Promise<void> {
+        await this.agenda?.stop();
+    }
 }
 
 export const agendaClient = new AgendaClient();

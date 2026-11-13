@@ -82,6 +82,7 @@ export async function scoreApplication(app: ScorableApplication): Promise<void> 
     }
 
     const scorer = getResumeScorer();
+    if (scorer.version === "stub-v1") return; // Compatibility only; automatic scoring uses AutomatedEvaluation.
     let alreadyScored: Set<string>;
     try {
         const positions = await ResumeScore.distinct("position", {
@@ -143,6 +144,7 @@ export async function getScoresForApplication(app: ScorableApplication): Promise
     if (!app.resumeHash) return [];
 
     const scoringVersion = getResumeScorer().version;
+    if (scoringVersion === "stub-v1") return []; // Placeholder zeroes are never assessments.
     const roles = (app.rolePreferences || []).map(pref => ({
         role: pref.role,
         position: normalizePosition(pref.role)
