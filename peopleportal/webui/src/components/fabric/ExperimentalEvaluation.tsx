@@ -8,12 +8,14 @@ function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, refresh
     preference: { role: string; subteamPk: string };
     refresh: number; onConfigured: (configured: boolean) => void;
 }) {
-    const { result, busy, queue } = useEvaluation({ teamPk, applicationId, preference, refresh, onConfigured });
+    const { result, busy, queue, loading, error, retryLoad } = useEvaluation({ teamPk, applicationId, preference, refresh, onConfigured });
     const evaluation = result?.evaluation;
     return <div className="rounded border p-3 space-y-3" aria-label={`Evaluation for ${preference.role}`}>
         <h5 className="font-medium">{preference.role}</h5>
         <p className="text-xs text-muted-foreground">Experimental title-based score.</p>
-        {!result?.configured && <p className="text-sm text-muted-foreground">AI scoring cannot run until the club enables its server-side AI configuration.</p>}
+        {loading && !result && <p role="status">Loading evaluation…</p>}
+        {error && <div role="alert"><p>{error}</p><Button size="sm" onClick={retryLoad}>Retry loading</Button></div>}
+        {result && !result.configured && <p className="text-sm text-muted-foreground">AI scoring cannot run until the club enables its server-side AI configuration.</p>}
         {evaluation && <div className="space-y-2 text-sm">
             <p>Status: <strong>{evaluation.status}</strong>{evaluation.overallScore !== undefined && ` · ${evaluation.overallScore}/100`}</p>
             {evaluation.failureMessage && <p>{evaluation.failureMessage}</p>}
@@ -38,6 +40,7 @@ export function ExperimentalEvaluation({ teamPk, applicationId, preferences }: {
     const [busy, setBusy] = React.useState(false);
     const [refresh, setRefresh] = React.useState(0);
     const onConfigured = React.useCallback((value: boolean) => setConfigured(value), []);
+    React.useEffect(() => { setConfigured(false); }, [applicationId]);
     async function queueAll() {
         setBusy(true);
         try {

@@ -78,3 +78,15 @@ Tests cover new arrivals without starvation, partial recovery, existing statuses
 pending worker drain, bounded exhaustion cadence and shutdown timeout. Server compile
 and focused tests pass. Performance review and low-priority delta re-review found
 no remaining actionable issue. Production load/query-plan testing remains required.
+
+## Batch 5 — reviewer loading and request recovery
+
+Depends on `73e6e15`. UI distinguishes initial loading, failed requests and disabled
+configuration. GET polling is completion-based and abortable; terminal states stop
+polling. Requests time out after 10 seconds; load failures back off and stop after
+five attempts, with manual retry available. Queue state uses a separate identity
+generation so load refreshes cannot strand buttons or apply results to another app.
+Seven mocked hook tests pass. Readability/testing reviewer found the busy-state
+race and missing timeout coverage; both fixed, delta re-reviewed without remaining
+actionable findings. Full web typecheck retains 18 pre-existing errors in unrelated
+files; changed ATS files do not appear in its diagnostics.
