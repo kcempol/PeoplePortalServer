@@ -1230,21 +1230,8 @@ export class ATSController extends Controller {
                 }
             }
 
-            // 9. Create/update applicant
-            const updatedApplicant = await Applicant.findOneAndUpdate(
-                { email: userEmail },
-                {
-                    $set: {
-                        email: userEmail,
-                        fullName: request.session.tempsession?.user?.name || userEmail.split('@')[0],
-                        profile: new Map(Object.entries(profile)),
-                        updatedAt: new Date()
-                    }
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            ).exec();
-
-            // 9.1 Validate Resume Signature
+            // 9. Validate Resume Signature (before any writes, so an invalid
+            //    file can never overwrite the applicant's stored profile)
             try {
                 const isValidSignature = await validateS3FileSignature(profile.resumeUrl, [FILE_SIGNATURES.PDF]);
                 if (!isValidSignature) {
@@ -1262,6 +1249,20 @@ export class ATSController extends Controller {
                 this.setStatus(500);
                 return { error: "FileProcessingError", message: "Failed to process resume file." };
             }
+
+            // 9.1 Create/update applicant
+            const updatedApplicant = await Applicant.findOneAndUpdate(
+                { email: userEmail },
+                {
+                    $set: {
+                        email: userEmail,
+                        fullName: request.session.tempsession?.user?.name || userEmail.split('@')[0],
+                        profile: new Map(Object.entries(profile)),
+                        updatedAt: new Date()
+                    }
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            ).exec();
 
             // 9.5 Check Previous App Dev History, if exists!
             let appDevInternalPk = null;
