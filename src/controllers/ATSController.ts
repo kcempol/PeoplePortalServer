@@ -36,6 +36,7 @@ import { OrgController } from "./OrgController";
 import { AuthorizedUser } from "../clients/OpenIdClient";
 import { validateS3FileSignature, FILE_SIGNATURES, copyS3Object, getS3ObjectSha256 } from '../utils/s3-validation';
 import { Types } from "mongoose";
+import { scoreApplication } from "../scoring/scoreApplication";
 import MarkdownIt from "markdown-it";
 
 // ====================
@@ -1060,6 +1061,10 @@ export class ATSController extends Controller {
      *   the SHA-256 of that copy is stored as `resumeHash`.
      * - The submitted profile is stored as `profileSnapshot`. The applicant's own profile
      *   remains a working copy that is replaced on every apply.
+     *
+     * After the application is created, the resume is scored in the background against
+     * every scoring position (not only the roles applied for). Scores are cached by
+     * `resumeHash`, so a byte-identical resume is never scored twice.
      * 
      * @param body Team Application Request
      * @param request Express Request Object
@@ -1335,6 +1340,11 @@ export class ATSController extends Controller {
                 updatedApplicant._id,
                 { $push: { applicationIds: application._id } }
             ).exec();
+
+            // 11. Score the resume against all positions in the background. Not
+            //     awaited: scoring never delays or fails the submission, and
+            //     resumes already scored (same hash) are skipped.
+            scoreApplication(application).catch(e => console.error("Background resume scoring failed", e));
 
             return {
                 message: "Application submitted successfully",
