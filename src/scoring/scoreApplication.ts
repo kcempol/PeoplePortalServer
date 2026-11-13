@@ -49,6 +49,19 @@ export interface ApplicationRoleScore {
 
 const MONGO_DUPLICATE_KEY = 11000;
 
+/** A score must be a finite number from 0 to 100 */
+function isValidScore(score: unknown): score is number {
+    return typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 100;
+}
+
+/** Keeps only finite numeric sub-scores; returns undefined if none remain */
+function sanitizeBreakdown(breakdown: unknown): Record<string, number> | undefined {
+    if (!breakdown || typeof breakdown !== "object" || Array.isArray(breakdown)) return undefined;
+    const entries = Object.entries(breakdown as Record<string, unknown>)
+        .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]));
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 /**
  * Scores an application's resume against EVERY position in
  * `ALL_SCORED_POSITIONS`, regardless of which roles were applied for.
@@ -87,6 +100,15 @@ export async function scoreApplication(app: ScorableApplication): Promise<void> 
 
         try {
             const result = await scorer.score({ resumeKey, resumeHash, position });
+
+            /* Never cache an invalid result: a stored record counts as "scored"
+               and would never be retried */
+            if (!isValidScore(result?.score)) {
+                console.error(`scoreApplication: scorer ${scorer.version} returned invalid score for "${position}"`, result?.score);
+                continue;
+            }
+
+            const breakdown = sanitizeBreakdown(result.breakdown);
             await ResumeScore.findOneAndUpdate(
                 { resumeHash, position, scoringVersion: scorer.version },
                 {
@@ -95,11 +117,11 @@ export async function scoreApplication(app: ScorableApplication): Promise<void> 
                         position,
                         scoringVersion: scorer.version,
                         score: result.score,
-                        breakdown: result.breakdown,
+                        breakdown,
                         scoredAt: new Date()
                     }
                 },
-                { upsert: true }
+                { upsert: true, runValidators: true }
             ).exec();
         } catch (e: any) {
             if (e?.code === MONGO_DUPLICATE_KEY) continue; /* Scored concurrently by another run */
