@@ -61,4 +61,3 @@ export function ExperimentalEvaluation({ teamPk, applicationId, preferences }: {
             teamPk={teamPk} applicationId={applicationId} preference={preference} refresh={refresh} onConfigured={onConfigured} />)}
     </section>;
 }
-

@@ -25,3 +25,21 @@ Local ATS source checkpoint: `0f7880bb2981c285af38dfd40f5088b983bfe106`.
 Rollback: revert deliverable commits newest-first. Do not revert the teammate merge
 or rewrite shared history. `git log --oneline integration/ats-unified` supplies exact
 commit SHAs; subsequent batches depend on this batch.
+
+## Batch 2 — atomic transitions and current scoring context
+
+Depends on batch 1 (`68bb6b5`). Manual transitions compare status plus revision;
+legacy documents with absent revision remain supported despite hydrated defaults.
+Processors require a lease and compare status/token/expiry/context before writes.
+Actual model/prompt/rubric and snapshot hash are stored together; requirements are
+loaded before scoring and checked again before publication. Scored reads compare
+immutable snapshot/context metadata instead of re-downloading every PDF.
+Queue handoff waits at most 250ms; late writes may finish safely and reconciliation
+repairs missing work. Fixed operational event codes contain no private data.
+
+Query-aware tests replace old unleased processing mocks and cover wrong token,
+expired lease, changed state/context, changed requirements, retry cap, new-context
+retry, legacy revision defaults and per-title scores. Server compilation and focused
+tests pass. Concurrency reviewer found hydrated-default compatibility issue; fixed
+and regression-tested. Delta re-review found no additional actionable issue.
+Real Mongo unique-index and transaction behavior remains a staging prerequisite.

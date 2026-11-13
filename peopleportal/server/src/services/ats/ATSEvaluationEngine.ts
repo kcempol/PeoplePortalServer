@@ -5,6 +5,12 @@ import type { CategoryKey, EvaluationCategory } from "../../models/AutomatedEval
 
 export const RUBRIC_VERSION = "title-rubric-v1";
 export const PROMPT_VERSION = "resume-evidence-v2";
+
+export function scoringContext(jobTitle: string, importantRequirements: string, snapshotHash: string, modelVersion: string) {
+    const context = { jobTitle, importantRequirements: importantRequirements.trim(), snapshotHash,
+        rubricVersion: RUBRIC_VERSION, promptVersion: PROMPT_VERSION, modelVersion };
+    return { ...context, contextKey: contentHash(JSON.stringify(context)) };
+}
 export const SCORING_INSTRUCTIONS = `Evaluate résumé evidence relevant to the specified job title and optional important requirements only.
 Use fixed categories: relevant skills and knowledge, demonstrated projects or work, relevant or transferable experience, and contributions and outcomes.
 Give each category a 0-100 score, short explanation, and up to five exact résumé excerpts. Do not calculate the overall score; the server does that.

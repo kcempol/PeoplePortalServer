@@ -137,7 +137,7 @@ export class ATSRecruitmentService {
             JSON.stringify(previousConfig.importantRequirementsByRole || []) !== JSON.stringify(importantRequirementsByRole))) {
             await AutomatedEvaluation.updateMany(
                 { subteamPk: teamId, status: { $in: ["scored", "queued", "processing"] } },
-                { $set: { status: "stale", staleAt: new Date() }, $unset: { leaseToken: 1, leaseUntil: 1 } },
+                { $set: { status: "stale", staleAt: new Date() }, $unset: { leaseToken: 1, leaseUntil: 1 }, $inc: { revision: 1 } },
             ).exec();
         }
 

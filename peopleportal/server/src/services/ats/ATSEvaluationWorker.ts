@@ -22,7 +22,7 @@ export const mongoEvaluationQueue: EvaluationQueue = {
                 { $or: [{ attempts: { $lt: MAX_ATTEMPTS } }, { attempts: { $exists: false } }] },
                 { $or: [{ status: "queued" }, { status: "processing", leaseUntil: { $lte: now } }] },
             ]
-        }, { $set: { status: "processing", leaseToken: token, leaseUntil: new Date(now.getTime() + LEASE_DURATION_MS) }, $inc: { attempts: 1 } },
+        }, { $set: { status: "processing", leaseToken: token, leaseUntil: new Date(now.getTime() + LEASE_DURATION_MS) }, $inc: { attempts: 1, revision: 1 } },
             { new: true, sort: { queuedAt: 1 } }).exec();
     },
 };

@@ -2,6 +2,12 @@
 export const MAX_ATTEMPTS = 3;
 export const LEASE_DURATION_MS = 120_000;
 export const WORKER_INTERVAL_MS = 2_000;
+export const SUBMISSION_QUEUE_TIMEOUT_MS = 250;
+
+/** Fixed operational codes only: callers must never pass source text or raw errors. */
+export function scoringEvent(code: "queue_failed" | "worker_failed" | "lease_lost" | "reconcile_failed" | "queue_timeout") {
+    console.warn(`[ats] ${code}`);
+}
 export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 export const MAX_TEXT_BYTES = 48_000;
 export const MIN_TEXT_LENGTH = 80;

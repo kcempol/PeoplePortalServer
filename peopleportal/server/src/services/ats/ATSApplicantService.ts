@@ -31,6 +31,7 @@ import { Application, ApplicationStage } from "../../models/Application";
 import { SubteamConfig } from "../../models/SubteamConfig";
 import { TeamRecruitingStatus } from "../../models/TeamRecruitingStatus";
 import { queueSubmittedApplication } from "./SubmissionEvaluationQueue";
+import { SUBMISSION_QUEUE_TIMEOUT_MS, scoringEvent } from "./ATSEvaluationTypes";
 import { copyS3Object, getS3ObjectSha256 } from "../../utils/s3-validation";
 import { s3Client, BUCKET_NAME } from "../../clients/AWSClient/S3Client";
 import {
@@ -294,7 +295,12 @@ export class ATSApplicantService {
 
             // Submission is already committed. Queue metadata only; the worker scores later.
             try {
-                await this.queueEvaluations(application);
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                try {
+                    await Promise.race([this.queueEvaluations(application), new Promise<void>(resolve => {
+                        timer = setTimeout(() => { scoringEvent("queue_timeout"); resolve(); }, SUBMISSION_QUEUE_TIMEOUT_MS);
+                    })]);
+                } finally { if (timer) clearTimeout(timer); }
             } catch {
                 // Scoring configuration/queue failures must not turn an accepted application into an error.
             }

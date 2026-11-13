@@ -3,7 +3,7 @@ import { AutomatedEvaluation } from "../../models/AutomatedEvaluation";
 import { SubteamConfig } from "../../models/SubteamConfig";
 import { PROMPT_VERSION, RUBRIC_VERSION } from "./ATSEvaluationEngine";
 import { productionEvaluationDependencies } from "./ATSEvaluationSetup";
-import { isEvaluationEnabled, type EvaluationDependencies } from "./ATSEvaluationTypes";
+import { isEvaluationEnabled, scoringEvent, type EvaluationDependencies } from "./ATSEvaluationTypes";
 
 /** Called only after the application transaction commits. Never extracts or scores inline. */
 export async function queueSubmittedApplication(
@@ -35,6 +35,7 @@ export async function queueSubmittedApplication(
                 modelVersion: deps.provider.modelVersion,
             } }, { upsert: true, timestamps: false }).exec();
         } catch {
+            scoringEvent("queue_failed");
             // A failure for one title must not prevent the other titles or the submission.
             // Reconciliation revisits missing records; reviewers can also recover them manually.
         }

@@ -25,6 +25,9 @@ export interface IAutomatedEvaluation extends Document {
     categories?: EvaluationCategory[];
     explanation?: string;
     resumeContentHash?: string;
+    snapshotHash?: string;
+    contextKey?: string;
+    revision?: number;
     rubricVersion: string;
     modelVersion: string;
     promptVersion: string;
@@ -62,6 +65,9 @@ const AutomatedEvaluationSchema = new Schema<IAutomatedEvaluation>({
     categories: [CategorySchema],
     explanation: String,
     resumeContentHash: String,
+    snapshotHash: String,
+    contextKey: String,
+    revision: { type: Number, default: 0 },
     rubricVersion: { type: String, required: true },
     modelVersion: { type: String, required: true },
     promptVersion: { type: String, required: true },
