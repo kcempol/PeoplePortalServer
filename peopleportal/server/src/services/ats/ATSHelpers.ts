@@ -16,6 +16,7 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { ApplicationRoleScore } from "../../scoring/scoreApplication";
 import type { Controller } from "tsoa";
 import type { GetGroupInfoResponse } from "../../clients/AuthentikClient/models";
 import type { ApplicantProfile } from "../../models/Applicant";
@@ -74,6 +75,7 @@ export interface ATSKanbanApplicationCard {
 }
 
 export interface ATSApplicationDetails extends ATSKanbanApplicationCard {
+    scores?: ApplicationRoleScore[];
     email: string;
     profile: Record<string, string>;
     responses: Record<string, string>;

@@ -19,49 +19,56 @@
 import { Document, Schema, Types, model } from "mongoose";
 
 export interface IApplicant extends Document {
-    _id: Types.ObjectId;
-    email: string;
-    fullName: string;
-    profile: Map<string, string>; // Made required with default
-    applicationIds: Types.ObjectId[];
-    // AI evaluations are stored by application/role in AutomatedEvaluation, not here.
-    createdAt: Date;
-    updatedAt: Date;
+  _id: Types.ObjectId;
+  email: string;
+  fullName: string;
+  /**
+   * The applicant's current "working copy" profile. It is replaced on every
+   * apply and merged by `POST /api/ats/profile`, so it always reflects the
+   * latest submission. Reviewers should read `Application.profileSnapshot`
+   * (the profile as submitted with that application) instead.
+   */
+  profile: Map<string, string>;
+  applicationIds: Types.ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const ApplicantSchema = new Schema<IApplicant>(
-    {
-        email: {
-            type: String,
-            required: true,
-            unique: true,
-            index: true,
-            lowercase: true,
-            trim: true,
-            validate: {
-                validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-                message: "Invalid email format",
-            },
-        },
-        fullName: { type: String, required: true, trim: true },
-        profile: {
-            type: Map,
-            of: String,
-            required: true,
-            default: new Map(),
-        },
-        applicationIds: [{ type: Schema.Types.ObjectId, ref: "Application" }],
-    },
-    { timestamps: true },
-);
+const ApplicantSchema = new Schema<IApplicant>({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
+    lowercase: true,
+    trim: true,
+    validate: {
+      validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      message: 'Invalid email format'
+    }
+  },
+  fullName: { type: String, required: true, trim: true },
+  profile: {
+    type: Map,
+    of: String,
+    required: true,
+    default: new Map()
+  },
+  applicationIds: [{ type: Schema.Types.ObjectId, ref: 'Application' }]
+}, { timestamps: true });
 
-export const Applicant = model<IApplicant>("Applicant", ApplicantSchema);
+export const Applicant = model<IApplicant>('Applicant', ApplicantSchema);
 
 export interface ApplicantProfile {
-    resumeUrl: string;
-    whyAppDev: string;
-    instagramFollow: string;
-    linkedinUrl?: string;
-    githubUrl?: string;
-    [key: string]: string | undefined;
+  /**
+   * S3 key (not a URL, despite the name) of the applicant's working resume,
+   * `resumes/<applicantId>.pdf`. Each upload overwrites it; at apply time it
+   * is copied to a per-application key stored in `Application.resumeKey`.
+   */
+  resumeUrl: string;
+  whyAppDev: string;
+  instagramFollow: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  [key: string]: string | undefined;
 }

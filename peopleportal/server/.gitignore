@@ -1,4 +1,6 @@
 .env
+.env.development
+.claude/
 .vscode/
 dist/
 node_modules/

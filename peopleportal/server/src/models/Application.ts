@@ -66,6 +66,29 @@ export interface IApplication extends Document {
     notes?: string;
     // Human feedback only. AutomatedEvaluation owns AI scores and evidence.
     pendingStageAction?: PendingStageAction;
+  /**
+   * S3 key of the resume submitted with THIS application
+   * (`resumes/<applicantId>/<applicationId>.pdf`). Copied from the applicant's
+   * working resume at apply time so later re-uploads never change what this
+   * team's reviewers see. Absent on applications created before this field
+   * existed; readers fall back to `Applicant.profile.resumeUrl`.
+   */
+  resumeKey?: string;
+
+  /**
+   * SHA-256 (hex) of the resume bytes at `resumeKey`, computed at apply time.
+   * Used as the cache key for `ResumeScore`, so byte-identical resumes are
+   * scored once no matter how many applications they are submitted with.
+   */
+  resumeHash?: string;
+
+  /**
+   * The applicant profile (resumeUrl, whyAppDev, links, ...) exactly as
+   * submitted with this application. `Applicant.profile` is overwritten on
+   * every apply, so reviewers read this snapshot instead. Absent on older
+   * applications; readers fall back to `Applicant.profile`.
+   */
+  profileSnapshot?: Map<string, string>;
 }
 
 const PendingStageActionSchema = new Schema<PendingStageAction>(
@@ -159,6 +182,9 @@ const ApplicationSchema = new Schema<IApplication>(
         stars: { type: Number, required: true, default: 0, min: 0, max: 5 },
         notes: { type: String, required: false, maxlength: 10000 },
         pendingStageAction: { type: PendingStageActionSchema, required: false },
+        resumeKey: { type: String, required: false },
+        resumeHash: { type: String, required: false, index: true },
+        profileSnapshot: { type: Map, of: String, required: false },
     },
     { timestamps: true },
 );

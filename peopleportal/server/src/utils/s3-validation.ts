@@ -1,3 +1,5 @@
+import { CopyObjectCommand } from "@aws-sdk/client-s3";
+import { createHash } from "crypto";
 /**
   People Portal Server
   Copyright (C) 2026  Atheesh Thirumalairajan
@@ -94,4 +96,39 @@ export async function deleteTempAvatar(key: string): Promise<void> {
     } catch (e) {
         console.error(`Failed to delete temp avatar: ${key}`, e);
     }
+}
+
+/**
+ * Computes the SHA-256 of an S3 object's full contents. Used to fingerprint
+ * resumes (10MB max) so identical files can share one set of ATS scores.
+ * Unlike the S3 ETag, this is always a true content hash regardless of
+ * upload method or bucket encryption.
+ *
+ * @param key The S3 key of the object to hash.
+ * @returns Hex-encoded SHA-256 digest. Throws if the object cannot be read.
+ */
+export async function getS3ObjectSha256(key: string): Promise<string> {
+    const { Body } = await s3Client.send(new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key
+    }));
+
+    if (!Body) throw new Error(`S3 object has no body: ${key}`);
+    const bytes = await Body.transformToByteArray();
+    return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * Copies an object within the configured bucket. Used to give each
+ * application its own immutable copy of the applicant's resume.
+ *
+ * @param sourceKey Key of the object to copy.
+ * @param destinationKey Key to copy it to (overwritten if it exists).
+ */
+export async function copyS3Object(sourceKey: string, destinationKey: string): Promise<void> {
+    await s3Client.send(new CopyObjectCommand({
+        Bucket: BUCKET_NAME,
+        CopySource: `${BUCKET_NAME}/${sourceKey.split("/").map(encodeURIComponent).join("/")}`,
+        Key: destinationKey
+    }));
 }
