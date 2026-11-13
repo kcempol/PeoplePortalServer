@@ -43,3 +43,21 @@ retry, legacy revision defaults and per-title scores. Server compilation and foc
 tests pass. Concurrency reviewer found hydrated-default compatibility issue; fixed
 and regression-tested. Delta re-review found no additional actionable issue.
 Real Mongo unique-index and transaction behavior remains a staging prerequisite.
+
+## Batch 3 — privacy policy and evidence integrity
+
+Depends on `83a11ba`. Prompt version increments to v3. Wrapped bullets are joined
+before filtering. Instruction-like/protected-content bullets are dropped, unknown
+narrative terms are redacted, and placeholder text cannot satisfy minimum evidence.
+Positive scores require nonempty substantive exact excerpts. Free-form model
+narratives are replaced by fixed safe schema choices; raw title and validated
+evidence still explain the per-title result. This deliberately sacrifices narrative
+richness and unfamiliar technical vocabulary for privacy. Calibration must measure
+that tradeoff before production.
+
+Production now also requires `ATS_AI_PRIVACY_REVIEWED_VERSION=work-evidence-v3`.
+Only club owners may approve this after reviewing residual heuristic limitations,
+ambiguous names/technical terms, languages and formats. This flag is not evidence
+of guaranteed privacy or scoring fairness. No approval was provisioned here.
+Adversarial synthetic tests cover lowercase traits/names, instructions, wrapped
+evidence, empty/placeholder excerpts, and complete-but-disabled config permutations.

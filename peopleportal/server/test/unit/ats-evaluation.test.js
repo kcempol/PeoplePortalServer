@@ -14,7 +14,7 @@ const resume = "Built a React application with TypeScript, wrote accessibility t
 const categories = [
   { key: "skills", score: 80, explanation: "Relevant skills", evidence: ["React application"] },
   { key: "projects", score: 60, explanation: "Built software", evidence: ["accessibility tests"] },
-  { key: "experience", score: 50, explanation: "Transferable experience", evidence: [] },
+  { key: "experience", score: 50, explanation: "Transferable experience", evidence: ["React application"] },
   { key: "outcomes", score: 90, explanation: "Measured outcome", evidence: ["reduced page load time by 30 percent"] },
 ];
 
@@ -26,11 +26,11 @@ test("server calculates weights and rejects invented evidence or unusable résum
   assert.equal(scored.resumeContentHash, contentHash(resume));
   await assert.rejects(scoreExtractedResume({ resumeText: "", jobTitle: "Frontend Engineer" }, provider), /No readable/);
   await assert.rejects(scoreExtractedResume({ resumeText: resume, jobTitle: "Frontend Engineer" },
-    new MockScoringProvider({ inferredJobFocus: "UI", explanation: "", categories: [{ ...categories[0], evidence: ["invented credential"] }, ...categories.slice(1)] })), /evidence could not be validated/);
+    new MockScoringProvider({ inferredJobFocus: "UI", explanation: "Demonstrated relevant work.", categories: [{ ...categories[0], evidence: ["invented credential"] }, ...categories.slice(1)] })), /evidence could not be validated/);
 });
 
 test("title, requirements, content hash, or version changes make a score stale", () => {
-  const saved = { jobTitle: "Frontend Engineer", importantRequirements: "React", resumeContentHash: "old", rubricVersion: "title-rubric-v1", modelVersion: "mock-test-only", promptVersion: "resume-evidence-v2" };
+  const saved = { jobTitle: "Frontend Engineer", importantRequirements: "React", resumeContentHash: "old", rubricVersion: "title-rubric-v1", modelVersion: "mock-test-only", promptVersion: "resume-evidence-v3" };
   assert.equal(isEvaluationStale(saved, { jobTitle: saved.jobTitle, importantRequirements: "React", resumeContentHash: "old", modelVersion: saved.modelVersion }), false);
   assert.equal(isEvaluationStale(saved, { jobTitle: "Backend Engineer", importantRequirements: "React", modelVersion: saved.modelVersion }), true);
   assert.equal(isEvaluationStale(saved, { jobTitle: saved.jobTitle, importantRequirements: "Python", modelVersion: saved.modelVersion }), true);

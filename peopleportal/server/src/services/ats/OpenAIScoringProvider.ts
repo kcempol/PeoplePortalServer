@@ -1,4 +1,4 @@
-import { PROVIDER_TIMEOUT_MS, CATEGORY_KEYS } from "./ATSEvaluationTypes";
+import { PROVIDER_TIMEOUT_MS, CATEGORY_KEYS, SAFE_FOCUS, SAFE_EXPLANATIONS } from "./ATSEvaluationTypes";
 import type { ClubScoringConfig } from "./ATSEvaluationSetup";
 import { EvaluationError, SCORING_INSTRUCTIONS, validateProviderResult, type SanitizedScoringInput, type ScoringProvider, type ProviderResult } from "./ATSEvaluationEngine";
 
@@ -18,8 +18,8 @@ export const OPENAI_RESPONSE_SCHEMA = {
     additionalProperties: false,
     required: ["inferredJobFocus", "explanation", "categories"],
     properties: {
-        inferredJobFocus: STRING_SCHEMA,
-        explanation: STRING_SCHEMA,
+        inferredJobFocus: { type: "string", enum: SAFE_FOCUS },
+        explanation: { type: "string", enum: SAFE_EXPLANATIONS },
         categories: {
             type: "array",
             items: {
@@ -29,7 +29,7 @@ export const OPENAI_RESPONSE_SCHEMA = {
                 properties: {
                     key: { type: "string", enum: CATEGORY_KEYS },
                     score: { type: "number", minimum: 0, maximum: 100 },
-                    explanation: STRING_SCHEMA,
+                    explanation: { type: "string", enum: SAFE_EXPLANATIONS },
                     evidence: { type: "array", items: STRING_SCHEMA },
                 },
             },

@@ -15,6 +15,10 @@ export const MAX_ESTIMATED_INPUT_TOKENS = 12_000;
 export const MAX_PDF_PAGES = 20;
 export const EXTRACTION_TIMEOUT_MS = 10_000;
 export const PROVIDER_TIMEOUT_MS = 45_000;
+export const PRIVACY_POLICY_VERSION = "work-evidence-v3";
+export const SAFE_FOCUS = ["Selected job title", "UI engineering", "Software development", "UI"];
+export const SAFE_EXPLANATIONS = ["Demonstrated relevant work.", "Evidence matches the title.", "Relevant skills", "Built software",
+    "Transferable experience", "Measured outcome", "No supporting evidence."];
 export const CATEGORY_KEYS = ["skills", "projects", "experience", "outcomes"] as const;
 export const EVALUATION_STATUSES = ["queued", "processing", "scored", "failed", "stale"] as const;
 import type { ScoringProvider } from "./ATSEvaluationEngine";

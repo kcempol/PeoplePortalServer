@@ -1,4 +1,5 @@
-/** Server-only configuration contract for a future club-owned provider. */
+import { PRIVACY_POLICY_VERSION } from "./ATSEvaluationTypes";
+/** Server-only configuration contract. Privacy approval must match the deployed preparation policy. */
 export interface ClubScoringConfig {
     apiKey: string;
     model: string;
@@ -32,7 +33,8 @@ import type { EvaluationDependencies } from "./ATSEvaluationService";
 // Never construct live clients during tests or development. Deployment requires
 // an explicit club confirmation as well as complete provider configuration.
 export function productionEvaluationDependencies(): EvaluationDependencies {
-    if (process.env.NODE_ENV !== "production" || process.env.ATS_AI_CLUB_CONFIRMED !== "true" || !process.env.S3_BUCKET_NAME) return {};
+    if (process.env.NODE_ENV !== "production" || process.env.ATS_AI_CLUB_CONFIRMED !== "true" ||
+        process.env.ATS_AI_PRIVACY_REVIEWED_VERSION !== PRIVACY_POLICY_VERSION || !process.env.S3_BUCKET_NAME) return {};
     const config = readClubScoringConfig();
     if (!config) return {};
     return {
