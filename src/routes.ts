@@ -2322,9 +2322,9 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsATSController_getApplicantUrls: Record<string, TsoaRoute.ParameterSchema> = {
                 teamId: {"in":"path","name":"teamId","required":true,"dataType":"string"},
-                applicantId: {"in":"path","name":"applicantId","required":true,"dataType":"string"},
+                applicationId: {"in":"path","name":"applicationId","required":true,"dataType":"string"},
         };
-        app.get('/api/ats/applications/:teamId/:applicantId/resume',
+        app.get('/api/ats/applications/:teamId/:applicationId/resume',
             authenticateMiddleware([{"bindles":["corp:hiringaccess"]}]),
             ...(fetchMiddlewares<RequestHandler>(ATSController)),
             ...(fetchMiddlewares<RequestHandler>(ATSController.prototype.getApplicantUrls)),

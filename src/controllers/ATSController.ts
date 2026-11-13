@@ -726,44 +726,57 @@ export class ATSController extends Controller {
     }
 
     /**
-     * Provides a signed AWS S3 URL to access the applicant's resume
-     * obtained from their profile. To obtain the resume, the user
-     * must either be a team owner or hold the `corp:hiringaccess` 
-     * bindle.
-     * 
-     * Information about the applicant will only be available if they applied
-     * to the team provided in the request.
-     * 
+     * Provides a signed AWS S3 URL (valid for 15 minutes) to the resume that was
+     * submitted with an application. To obtain the resume, the user must either be
+     * a team owner or hold the `corp:hiringaccess` bindle.
+     *
+     * The application must belong to the team in the request; otherwise a 404 is
+     * returned. The resume served is the application's own copy (`resumeKey`), so
+     * resumes uploaded for later applications never change what this team sees.
+     * Applications created before per-application resumes existed fall back to the
+     * applicant's current profile resume.
+     *
+     * For backwards compatibility, an **applicant ID** is also accepted in place of the
+     * application ID. It resolves to that applicant's application for this team (there
+     * is at most one), with the same team check.
+     *
      * @param teamId People Portal Team ID
-     * @param applicantId Applicant's ID
-     * @returns Signed S3 Download URL
+     * @param applicationId Application ID (or, for older clients, the Applicant ID)
+     * @returns Signed S3 Download URL, or `resumeUrl: undefined` if no resume is on file
      */
-    @Get("applications/{teamId}/{applicantId}/resume")
+    @Get("applications/{teamId}/{applicationId}/resume")
     @Tags("Recruitment Actions")
     @SuccessResponse(200)
     @Security("bindles", ["corp:hiringaccess"])
-    async getApplicantUrls(@Path() teamId: string, @Path() applicantId: string) {
+    async getApplicantUrls(@Path() teamId: string, @Path() applicationId: string) {
         try {
-            const applicant = await Applicant.findById(applicantId);
-            if (!applicant) {
+            if (!Types.ObjectId.isValid(applicationId)) {
                 this.setStatus(404);
-                return { error: "NotFound", message: "Applicant not found" };
+                return { error: "NotFound", message: "Application not found" };
             }
 
-            /* TODO: Verify that the applicant has applied to this team */
+            /* Resolve by application ID first, then by applicant ID (older clients). Both are scoped to the team. */
+            const application =
+                await Application.findOne({ _id: applicationId, teamPk: teamId }).select('resumeKey applicantId').lean().exec() ??
+                await Application.findOne({ applicantId: applicationId, teamPk: teamId }).select('resumeKey applicantId').lean().exec();
 
-            const profile = applicant.profile || new Map<string, string>();
+            if (!application) {
+                this.setStatus(404);
+                return { error: "NotFound", message: "Application not found" };
+            }
+
+            /* Per-application copy, or the profile resume for applications that predate it */
+            let resumeUrl: string | undefined = application.resumeKey;
+            if (!resumeUrl) {
+                const applicant = await Applicant.findById(application.applicantId).exec();
+                resumeUrl = applicant?.profile?.get('resumeUrl');
+            }
+
             let resumeDownloadUrl: string | undefined;
-
-            const resumeUrl = profile.get('resumeUrl');
             if (resumeUrl) {
                 try {
-                    // Check if it's an S3 key (simple heuristic or assume it is if stored internally)
-                    // The upload endpoint stores it as `resumes/${applicant._id}/${Date.now()}.${fileExtension}`
-                    // If it looks like a key, sign it.
-                    // If it's already a full URL (legacy?), just return it (though our new flow uses keys).
-
-                    // For now, we assume if it doesn't start with http, it's a key.
+                    // Stored values are S3 keys. Values starting with http are legacy
+                    // full URLs and are returned as-is.
                     if (!resumeUrl.startsWith('http')) {
                         const command = new GetObjectCommand({
                             Bucket: BUCKET_NAME,
