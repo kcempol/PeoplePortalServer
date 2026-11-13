@@ -1,19 +1,8 @@
-import { Application, ApplicationStage } from "../models/Application";
-import { SubteamConfig } from "../models/SubteamConfig";
-import { TeamRecruitingStatus } from "../models/TeamRecruitingStatus";
+import { Application } from "../models/Application";
 import { Types } from "mongoose";
-import { AuthentikClientError, AuthentikClientErrorType } from "../clients/AuthentikClient/models";
-import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client, BUCKET_NAME } from "../clients/AWSClient/S3Client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { validateS3FileSignature, FILE_SIGNATURES, copyS3Object, getS3ObjectSha256 } from "../utils/s3-validation";
-
-const MAX_RESPONSE_LENGTH = 2000;
-const MAX_WHY_APPDEV_WORDS = 200;
-const MIN_RESPONSE_WORDS = 10;
-function isOwnResumeKey(applicantId: string, key: string): boolean {
-    return key === `resumes/${applicantId}.pdf` || key.startsWith(`resumes/${applicantId}/`);
-}
 /**
   People Portal Server
   Copyright (C) 2026  Atheesh Thirumalairajan
@@ -68,7 +57,7 @@ import type {
 } from "../services/ats/ATSHelpers";
 
 /* HTTP entry points for recruitment. Decorators describe access rules and the
- * public API; each method delegates the workflow to one of three services:
+ * public API; methods delegate recruitment and evaluation workflows to services:
  * applicants: profiles, resume links, and submissions;
  * applications: recruiter review, feedback, and stage changes;
  * recruitment: open roles, team settings, and recruitment totals.
@@ -398,7 +387,7 @@ export class ATSController extends Controller {
                     }
 
                 } catch (s3Error) {
-                    console.error("Error signing S3 URL:", s3Error);
+                    console.warn("[ats] resume_signing_failed");
                     // Fallback or just ignore, maybe client can deal with the raw key or empty string?
                     // We'll leave it undefined if signing fails.
                 }
@@ -409,7 +398,7 @@ export class ATSController extends Controller {
             };
 
         } catch (err) {
-            console.error("Error fetching applicant URLs:", err);
+            console.warn("[ats] resume_lookup_failed");
             this.setStatus(500);
             return { error: "ServerError", message: "Failed to fetch applicant URLs" };
         }

@@ -152,7 +152,7 @@ export class ATSApplicantService {
             this.response.setHeader("Location", downloadUrl);
             return;
         } catch (error) {
-            console.error("Error generating download URL:", error);
+            console.warn("[ats] resume_download_failed");
             this.response.setStatus(404);
             return {
                 error: "NotFound",
@@ -275,7 +275,7 @@ export class ATSApplicantService {
                 );
                 if (resumeError) return resumeError;
             } catch (e) {
-                console.error("Failed to validate resume", e);
+                console.warn("[ats] resume_validation_failed");
                 this.response.setStatus(500);
                 return {
                     error: "FileProcessingError",
@@ -328,7 +328,7 @@ export class ATSApplicantService {
                     message: "You have already applied to this team.",
                 };
             }
-            console.error("Application submission error:", err);
+            console.warn("[ats] application_submission_failed");
             this.response.setStatus(500);
             return {
                 error: "ServerError",
@@ -388,7 +388,7 @@ export class ATSApplicantService {
 
             return { message: "Profile updated successfully" };
         } catch (err) {
-            console.error("Error updating profile:", err);
+            console.warn("[ats] profile_update_failed");
             this.response.setStatus(500);
             return {
                 error: "ServerError",

@@ -90,3 +90,46 @@ Seven mocked hook tests pass. Readability/testing reviewer found the busy-state
 race and missing timeout coverage; both fixed, delta re-reviewed without remaining
 actionable findings. Full web typecheck retains 18 pre-existing errors in unrelated
 files; changed ATS files do not appear in its diagnostics.
+
+## Final audit follow-ups and verification
+
+Batch 6 depends on `97bb452`. Final correctness review requested a fresh attempt
+cycle when a worker discovers changed context before scoring; reset-to-one on the
+claimed attempt is now covered by a regression. Final privacy review requested the
+same boundary on job titles/requirements; provider fields are prepared while raw
+context identity stays distinct. Prompt and privacy-policy versions increment to
+v4 so older approvals/results cannot be reused. Static S3 configuration and API
+key/model values must be nonblank. Active snapshot/submission error logs use fixed
+codes only. Runtime/rollout documentation now agrees with these gates and shutdown.
+
+Final specialist audit dispositions (sequential, read-only):
+- Correctness: no blocker/high; immutable storage and API-field deprecation documented;
+  new-context attempt allowance corrected and tested.
+- Concurrency: no blocker/high; real Mongo races/transactions remain staging work.
+- Privacy/security: no blocker/high after Unicode and job-context delta fixes;
+  semantic privacy, calibration and fairness still require human review.
+- Performance: no blocker/high; no measured throughput claim; sweep latency and
+  multi-instance overhead documented.
+- Readability/testing: no blocker/high; rollout and final ledger completion requested
+  and addressed. Focused UI timeout/identity tests are meaningful regressions.
+
+Verification: server generation/compilation, 53 final focused ATS tests, 168 final server
+unit tests, all 36 UI tests, scoped ATS UI typecheck,
+and diff checks passed. Full UI compilation retains 18 pre-existing errors outside
+the changed ATS files. Model/parser/provider/network components were mocked; no
+real Mongo/S3/OpenAI integration or résumé data was used. Production enablement,
+schema/index deployment and storage immutability still require approved staging.
+
+## Delivery commits and rollback
+
+| Commit | Purpose |
+| --- | --- |
+| `68bb6b5` | Restore local workflow and adapt application snapshots |
+| `83a11ba` | Atomic state/context transitions |
+| `b35e66f` | Evidence and privacy boundary |
+| `73e6e15` | Bounded reconciliation and graceful drain |
+| `97bb452` | UI error/poll recovery |
+
+The final audit-fix commit follows these entries (`git log --oneline` identifies
+it). Revert newest-first through this list, stopping before base `a140102`.
+The checkpoint and teammate history are retained; nothing was pushed or deployed.

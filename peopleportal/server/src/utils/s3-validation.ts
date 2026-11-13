@@ -65,7 +65,7 @@ export async function validateS3FileSignature(
             header.startsWith(sig.toLowerCase()),
         );
     } catch (e) {
-        console.error(`Signature check failed for key: ${key}`, e);
+        console.warn("File signature validation failed");
         return false;
     }
 }

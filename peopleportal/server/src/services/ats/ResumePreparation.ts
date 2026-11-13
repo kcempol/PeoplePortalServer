@@ -64,6 +64,13 @@ export function prohibitedContent(text: string): boolean {
     return PROHIBITED_PATTERNS.some(pattern => pattern.test(text));
 }
 
+/** Club-managed titles/requirements still cross the same provider privacy boundary. */
+export function prepareJobContext(text: string): string {
+    if (prohibitedContent(text)) throw new EvaluationError("INVALID_JOB_CONTEXT", "The job context contains prohibited personal information.");
+    return redactEntities(text).replace(/[\p{L}\p{M}][\p{L}\p{M}'-]*/gu,
+        token => SAFE_WORDS.has(token.toLowerCase()) ? token : "[detail removed]");
+}
+
 // Conservative proper-name filter. Unknown capitalized tokens are removed even
 // when that sacrifices evidence; extend technical vocabulary only after review.
 const SAFE_CAPITALIZED = new Set([
@@ -73,6 +80,7 @@ const SAFE_CAPITALIZED = new Set([
     "C SQL HTML CSS Node Express MongoDB PostgreSQL Docker Kubernetes AWS API",
     "APIs REST GraphQL Git Linux Figma TensorFlow PyTorch NLP ML AI CI",
     "CD Unit Integration Accessibility The This A No Limited Strong Some",
+    "Product Manager Machine Learning Quantum Researcher Fullstack DevOps UX Designer",
 ].join(" ").split(/\s+/));
 // Reviewed work vocabulary; unknown names/organizations and unfamiliar technical terms are removed.
 const SAFE_WORDS = new Set([...SAFE_CAPITALIZED].map(word => word.toLowerCase()).concat((

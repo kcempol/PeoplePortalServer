@@ -30,7 +30,7 @@ test("server calculates weights and rejects invented evidence or unusable résum
 });
 
 test("title, requirements, content hash, or version changes make a score stale", () => {
-  const saved = { jobTitle: "Frontend Engineer", importantRequirements: "React", resumeContentHash: "old", rubricVersion: "title-rubric-v1", modelVersion: "mock-test-only", promptVersion: "resume-evidence-v3" };
+  const saved = { jobTitle: "Frontend Engineer", importantRequirements: "React", resumeContentHash: "old", rubricVersion: "title-rubric-v1", modelVersion: "mock-test-only", promptVersion: "resume-evidence-v4" };
   assert.equal(isEvaluationStale(saved, { jobTitle: saved.jobTitle, importantRequirements: "React", resumeContentHash: "old", modelVersion: saved.modelVersion }), false);
   assert.equal(isEvaluationStale(saved, { jobTitle: "Backend Engineer", importantRequirements: "React", modelVersion: saved.modelVersion }), true);
   assert.equal(isEvaluationStale(saved, { jobTitle: saved.jobTitle, importantRequirements: "Python", modelVersion: saved.modelVersion }), true);

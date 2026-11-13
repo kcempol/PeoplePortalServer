@@ -29,8 +29,11 @@ export class ATSEvaluationProcessor {
         let context: Awaited<ReturnType<typeof loadScoringContext>> | undefined;
         try {
             context = await loadScoringContext(record, this.deps.provider.modelVersion);
+            const changedContext = record.contextKey ? record.contextKey !== context.contextKey :
+                record.modelVersion !== context.modelVersion || record.rubricVersion !== context.rubricVersion ||
+                record.promptVersion !== context.promptVersion || (record.importantRequirements || "").trim() !== context.importantRequirements;
             const started = await AutomatedEvaluation.findOneAndUpdate(owned(), {
-                $set: { ...context, startedAt: new Date() }, $inc: { revision: 1 },
+                $set: { ...context, startedAt: new Date(), ...(changedContext ? { attempts: 1 } : {}) }, $inc: { revision: 1 },
             }, { new: true }).exec();
             if (!started) { scoringEvent("lease_lost"); return; }
             const resumeText = await this.deps.extractResumeText(String(record.applicationId));

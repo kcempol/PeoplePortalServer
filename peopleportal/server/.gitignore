@@ -3,7 +3,7 @@
 .claude/
 .vscode/
 dist/
-node_modules/
+node_modules
 docs/site/
 docs/.venv/
 .DS_Store

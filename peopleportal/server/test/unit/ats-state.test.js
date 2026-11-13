@@ -90,3 +90,12 @@ test("legacy missing revision is invalidated safely despite hydrate defaults", a
   assert.equal(result.evaluation.status, "stale");
   assert.equal(f.memory.records[0].status, "stale");
 });
+
+test("a newly discovered context during claim starts its own bounded attempt cycle", async t => {
+  const f = fixture(t); await f.service.queue("team", String(f.app._id), f.request);
+  Object.assign(f.memory.records[0], { contextKey: "previous-context", attempts: 2 });
+  f.deps.provider.score = async () => { throw new Error("synthetic failure"); };
+  await new ATSEvaluationWorker(f.deps).tick();
+  assert.equal(f.memory.records[0].attempts, 1);
+  assert.equal(f.memory.records[0].status, "failed");
+});

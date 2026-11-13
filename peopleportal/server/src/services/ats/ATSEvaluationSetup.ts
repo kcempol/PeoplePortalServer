@@ -11,7 +11,7 @@ export interface ClubScoringConfig {
 }
 
 export function readClubScoringConfig(env: NodeJS.ProcessEnv = process.env): ClubScoringConfig | null {
-    if (env.ATS_AI_SCORING_ENABLED !== "true" || !env.OPENAI_API_KEY || !env.ATS_AI_MODEL) return null;
+    if (env.ATS_AI_SCORING_ENABLED !== "true" || !env.OPENAI_API_KEY?.trim() || !env.ATS_AI_MODEL?.trim()) return null;
     const maxOutputTokens = Number(env.ATS_AI_MAX_OUTPUT_TOKENS);
     const maxCostUsdPerEvaluation = Number(env.ATS_AI_MAX_COST_USD_PER_EVALUATION);
     const totalBudgetUsd = Number(env.ATS_AI_TOTAL_BUDGET_USD);
@@ -34,7 +34,8 @@ import type { EvaluationDependencies } from "./ATSEvaluationService";
 // an explicit club confirmation as well as complete provider configuration.
 export function productionEvaluationDependencies(): EvaluationDependencies {
     if (process.env.NODE_ENV !== "production" || process.env.ATS_AI_CLUB_CONFIRMED !== "true" ||
-        process.env.ATS_AI_PRIVACY_REVIEWED_VERSION !== PRIVACY_POLICY_VERSION || !process.env.S3_BUCKET_NAME) return {};
+        process.env.ATS_AI_PRIVACY_REVIEWED_VERSION !== PRIVACY_POLICY_VERSION || !process.env.S3_BUCKET_NAME?.trim() ||
+        !process.env.AWS_ACCESS_KEY_ID?.trim() || !process.env.AWS_SECRET_ACCESS_KEY?.trim()) return {};
     const config = readClubScoringConfig();
     if (!config) return {};
     return {

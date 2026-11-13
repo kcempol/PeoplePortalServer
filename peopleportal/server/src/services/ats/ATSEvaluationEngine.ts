@@ -1,11 +1,11 @@
-import { EvaluationError, validateResumeText, prepareResumeEvidence, prohibitedContent, redactEntities } from "./ResumePreparation";
+import { EvaluationError, validateResumeText, prepareResumeEvidence, prepareJobContext, prohibitedContent, redactEntities } from "./ResumePreparation";
 export { EvaluationError, validateResumeText, prepareResumeEvidence, prohibitedContent } from "./ResumePreparation";
 import { createHash } from "crypto";
 import type { CategoryKey, EvaluationCategory } from "../../models/AutomatedEvaluation";
 import { SAFE_FOCUS, SAFE_EXPLANATIONS } from "./ATSEvaluationTypes";
 
 export const RUBRIC_VERSION = "title-rubric-v1";
-export const PROMPT_VERSION = "resume-evidence-v3";
+export const PROMPT_VERSION = "resume-evidence-v4";
 
 export function scoringContext(jobTitle: string, importantRequirements: string, snapshotHash: string, modelVersion: string) {
     const context = { jobTitle, importantRequirements: importantRequirements.trim(), snapshotHash,
@@ -38,7 +38,8 @@ declare const sanitizedInput: unique symbol;
 /** Only prepareScoringInput creates this boundary type. */
 export type SanitizedScoringInput = ScoringInput & { readonly [sanitizedInput]: true };
 export function prepareScoringInput(input: ScoringInput): SanitizedScoringInput {
-    return { ...input, resumeText: prepareResumeEvidence(input.resumeText) } as SanitizedScoringInput;
+    return { resumeText: prepareResumeEvidence(input.resumeText), jobTitle: prepareJobContext(input.jobTitle),
+        importantRequirements: prepareJobContext(input.importantRequirements || "") } as SanitizedScoringInput;
 }
 
 export interface ProviderResult {

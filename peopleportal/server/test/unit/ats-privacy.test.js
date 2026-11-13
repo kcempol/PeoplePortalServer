@@ -34,13 +34,15 @@ test("unsupported positive scores and empty evidence are rejected", () => {
 
 test("complete synthetic configuration stays disabled in development/test and fails closed for each missing production gate", () => {
   const { productionEvaluationDependencies } = require("../../dist/services/ats/ATSEvaluationSetup");
-  const complete = { NODE_ENV: "production", ATS_AI_CLUB_CONFIRMED: "true", ATS_AI_PRIVACY_REVIEWED_VERSION: "work-evidence-v3",
-    S3_BUCKET_NAME: "synthetic-bucket", ATS_AI_SCORING_ENABLED: "true", OPENAI_API_KEY: "not-a-credential", ATS_AI_MODEL: "mock-model",
+  const complete = { NODE_ENV: "production", ATS_AI_CLUB_CONFIRMED: "true", ATS_AI_PRIVACY_REVIEWED_VERSION: "work-evidence-v4",
+    S3_BUCKET_NAME: "synthetic-bucket", AWS_ACCESS_KEY_ID: "synthetic-access", AWS_SECRET_ACCESS_KEY: "synthetic-secret",
+    ATS_AI_SCORING_ENABLED: "true", OPENAI_API_KEY: "not-a-credential", ATS_AI_MODEL: "mock-model",
     ATS_AI_MAX_OUTPUT_TOKENS: "1000", ATS_AI_MAX_COST_USD_PER_EVALUATION: "1", ATS_AI_TOTAL_BUDGET_USD: "2",
     ATS_AI_INPUT_USD_PER_MILLION: "1", ATS_AI_OUTPUT_USD_PER_MILLION: "1" };
   const previous = Object.fromEntries(Object.keys(complete).map(key => [key, process.env[key]]));
   try {
     Object.assign(process.env, complete);
+    assert.equal(productionEvaluationDependencies().enabled, true); // Constructs injected boundaries only; no I/O.
     for (const mode of ["development", "test"]) {
       process.env.NODE_ENV = mode; assert.deepEqual(productionEvaluationDependencies(), {});
     }
@@ -60,4 +62,14 @@ test("free-form identifying explanations are rejected even with lowercase wordin
     const result = makeResult(); result.explanation = explanation;
     assert.throws(() => validateProviderResult(result, resume));
   }
+});
+
+test("provider job context removes identifying words while raw scoring identity remains distinct", () => {
+  const { scoringContext } = require("../../dist/services/ats/ATSEvaluationEngine");
+  const input = { resumeText: resume, jobTitle: "Quantum Researcher", importantRequirements: "React experience at acmecorp with johnsmith" };
+  const safe = prepareScoringInput(input);
+  assert.equal(safe.jobTitle, "Quantum Researcher");
+  assert.ok(!safe.importantRequirements.includes("acmecorp")); assert.ok(!safe.importantRequirements.includes("johnsmith"));
+  assert.notEqual(scoringContext(input.jobTitle, input.importantRequirements, "a", "model").contextKey,
+    scoringContext(input.jobTitle, "different requirements", "a", "model").contextKey);
 });
