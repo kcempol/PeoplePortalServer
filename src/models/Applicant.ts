@@ -21,7 +21,13 @@ import { Document, Schema, model } from "mongoose";
 export interface IApplicant extends Document {
   email: string;
   fullName: string;
-  profile: Map<string, string>; // Made required with default
+  /**
+   * The applicant's current "working copy" profile. It is replaced on every
+   * apply and merged by `POST /api/ats/profile`, so it always reflects the
+   * latest submission. Reviewers should read `Application.profileSnapshot`
+   * (the profile as submitted with that application) instead.
+   */
+  profile: Map<string, string>;
   applicationIds: Schema.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +59,11 @@ const ApplicantSchema = new Schema<IApplicant>({
 export const Applicant = model<IApplicant>('Applicant', ApplicantSchema);
 
 export interface ApplicantProfile {
+  /**
+   * S3 key (not a URL, despite the name) of the applicant's working resume,
+   * `resumes/<applicantId>.pdf`. Each upload overwrites it; at apply time it
+   * is copied to a per-application key stored in `Application.resumeKey`.
+   */
   resumeUrl: string;
   whyAppDev: string;
   instagramFollow: string;
