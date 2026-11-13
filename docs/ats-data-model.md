@@ -112,6 +112,45 @@ Stub scores remain in the collection under `stub-v1` and can be deleted.
 
 Full request/response docs are generated from the controller JSDoc and served at `/api/docs`.
 
+## Rollback
+
+Every commit on `feature/ats-schema-update` builds on its own, so the fastest rollback
+after a failed deploy is to **redeploy the last known-good commit**. When a change has to
+come out of the branch instead, use `git revert` as described below.
+
+Not every commit can be reverted alone. Later commits edit the same lines (conflicts), or
+use code that an earlier commit added (the build breaks). The table was checked at
+`3318e96` by reverting each commit, or each group of commits, in a scratch worktree and
+running `tsoa spec-and-routes` + `tsc`.
+
+| Commit | What it does | Revert alone? | How to roll it back |
+|---|---|---|---|
+| `65900ed` | gitignore | ✅ | `git revert 65900ed` |
+| `0c73f1c` | schema fields + `ResumeScore` model | ❌ build breaks (everything later uses it) | `git revert --no-edit 0c73f1c^..HEAD` (the whole feature) |
+| `43ee17a` | scoring module | ❌ conflicts | revert the scoring group below |
+| `903bf59` | S3 copy/hash helpers | ❌ build breaks (apply flow uses them) | `git revert --no-edit 903bf59^..HEAD` |
+| `99a3e65` | PDF check before writes | ❌ conflicts with `7451ae2` | `git revert --no-edit 99a3e65^..HEAD` |
+| `ea61dc3` | per-application resume copy, hash, snapshot | ❌ conflicts, and later endpoints use its `Types` import | `git revert --no-edit ea61dc3^..HEAD` |
+| `4b3e40e` | background scoring after apply | ❌ import-line conflict with `7591372` | `git revert --no-edit 7591372 4b3e40e` (stops scoring; details no longer return `scores`) |
+| `9bbcaec` | resume by application ID + team check | ✅ | `git revert 9bbcaec` |
+| `7591372` | snapshot profile + scores in details | ✅ | `git revert 7591372` |
+| `5947b98` | otherapps team check | ✅ | `git revert 5947b98` |
+| `66aa90b` | this doc | ✅ | `git revert 66aa90b` |
+| `7451ae2` | resume key ownership check | ✅ | `git revert 7451ae2` (**reopens a security gap**: avoid) |
+| `3318e96` | reject invalid scorer results | ✅ | `git revert 3318e96` |
+
+**Grouped rollbacks** (each verified to build):
+
+- **Remove the whole scoring feature:** `git revert --no-edit 3318e96 7591372 4b3e40e 43ee17a`.
+  Resumes are still copied and hashed per application, and existing `ResumeScore` documents
+  are left untouched.
+- **Remove per-application resumes and everything after them:**
+  `git revert --no-edit ea61dc3^..HEAD`. Applications already created keep their
+  `resumeKey`, `resumeHash` and `profileSnapshot` fields, which the reverted code ignores.
+
+A range like `X^..HEAD` reverts newest-first, which is why it applies cleanly. Commits added
+after this table was written also need checking: a range revert includes them as well.
+
 ## Known limitations
 
 - Resumes overwritten before this change cannot be recovered; those applications use the
