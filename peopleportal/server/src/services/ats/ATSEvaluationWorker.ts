@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { AutomatedEvaluation, type IAutomatedEvaluation } from "../../models/AutomatedEvaluation";
 import { ATSEvaluationProcessor } from "./ATSEvaluationProcessor";
-import { isEvaluationEnabled, type EvaluationDependencies, MAX_ATTEMPTS, LEASE_DURATION_MS, WORKER_INTERVAL_MS } from "./ATSEvaluationTypes";
+import { isEvaluationEnabled, scoringEvent, type EvaluationDependencies, MAX_ATTEMPTS, LEASE_DURATION_MS, WORKER_INTERVAL_MS } from "./ATSEvaluationTypes";
 export { MAX_ATTEMPTS } from "./ATSEvaluationTypes";
 
 export interface EvaluationQueue {
@@ -27,25 +27,31 @@ export const mongoEvaluationQueue: EvaluationQueue = {
     },
 };
 export class ATSEvaluationWorker {
+    private lastExhaustionCheck = 0;
     constructor(private readonly deps: EvaluationDependencies, private readonly queue: EvaluationQueue = mongoEvaluationQueue) { }
     async tick(): Promise<boolean> {
         if (!isEvaluationEnabled(this.deps)) return false;
         const now = new Date();
-        await this.queue.exhaust(now);
+        if (now.getTime() - this.lastExhaustionCheck >= 60_000) {
+            await this.queue.exhaust(now);
+            this.lastExhaustionCheck = now.getTime();
+        }
         const token = randomUUID();
         const record = await this.queue.claim(token, now);
         if (!record) return false;
         await new ATSEvaluationProcessor(this.deps).process(record, token);
         return true;
     }
-    start(): () => void {
-        if (!isEvaluationEnabled(this.deps)) return () => { };
+    start(): () => Promise<void> {
+        if (!isEvaluationEnabled(this.deps)) return async () => { };
         let stopped = false;
+        let inFlight = Promise.resolve();
         const run = async () => {
-            try { await this.tick(); } catch { /* No raw errors or résumé text in logs. Expired leases recover work. */ }
+            inFlight = this.tick().then(() => {}).catch(() => { scoringEvent("worker_failed"); });
+            await inFlight;
             if (!stopped) timer = setTimeout(run, WORKER_INTERVAL_MS);
         };
         let timer = setTimeout(run, 0);
-        return () => { stopped = true; clearTimeout(timer); };
+        return async () => { stopped = true; clearTimeout(timer); await inFlight; };
     }
 }

@@ -61,3 +61,20 @@ ambiguous names/technical terms, languages and formats. This flag is not evidenc
 of guaranteed privacy or scoring fairness. No approval was provisioned here.
 Adversarial synthetic tests cover lowercase traits/names, instructions, wrapped
 evidence, empty/placeholder excerpts, and complete-but-disabled config permutations.
+
+Privacy reviewer found a Unicode-name bypass; Unicode-aware tokenization and four
+script regression cases close that demonstrated gap. Delta review found no further
+actionable issue. Baseline heuristic limitations remain subject to club review.
+
+## Batch 4 — bounded recovery and graceful shutdown
+
+Depends on `b35e66f`. Reconciliation uses a finite high-water mark per sweep, one
+batch lookup for existing evaluations, a shared per-subteam config promise and a
+batch-local tuple set. Missing records remain retryable after interrupted passes.
+Retry-exhaustion scans run once/minute rather than once/job. Shutdown stops accepting
+requests, stops schedules, drains active work and closes Agenda/Redis/Mongo, with a
+30-second force-termination deadline. Fixed event codes expose operational failures.
+Tests cover new arrivals without starvation, partial recovery, existing statuses,
+pending worker drain, bounded exhaustion cadence and shutdown timeout. Server compile
+and focused tests pass. Performance review and low-priority delta re-review found
+no remaining actionable issue. Production load/query-plan testing remains required.

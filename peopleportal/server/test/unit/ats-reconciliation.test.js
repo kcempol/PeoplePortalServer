@@ -16,8 +16,17 @@ function fixture(t, count = 1) {
   t.mock.method(Application, "find", filter => {
     const query = { select() { return query; }, sort() { return query; }, limit(n) {
       assert.equal(n, RECONCILIATION_BATCH_SIZE); return query;
-    }, exec: async () => apps.filter(app => !filter._id || String(app._id) > String(filter._id.$gt)).slice(0, RECONCILIATION_BATCH_SIZE) };
+    }, exec: async () => apps.filter(app => !filter._id || ((!filter._id.$gt || String(app._id) > String(filter._id.$gt)) &&
+      (!filter._id.$lte || String(app._id) <= String(filter._id.$lte)))).slice(0, RECONCILIATION_BATCH_SIZE) };
     return query;
+  });
+  t.mock.method(Application, "findOne", () => {
+    const query = { select() { return query; }, sort() { return query; }, exec: async () => apps.at(-1) || null }; return query;
+  });
+  t.mock.method(AutomatedEvaluation, "find", filter => {
+    const query = { select() { return query; }, lean() { return query; }, exec: async () => [...records.entries()].map(([key, record]) => {
+      const [applicationId, subteamPk, ...role] = key.split(":"); return { ...record, applicationId, subteamPk, jobTitle: role.join(":") };
+    }).filter(record => filter.applicationId.$in.map(String).includes(String(record.applicationId))) }; return query;
   });
   t.mock.method(AutomatedEvaluation, "findOne", filter => {
     const query = { select() { return query; }, exec: async () => records.get(key(filter)) || null }; return query;
@@ -75,6 +84,19 @@ test("disabled reconciler accesses no models", async t => {
   t.mock.method(Application, "find", () => assert.fail("disabled worker accessed database"));
   await new EvaluationReconciliationWorker({}).tick();
   new EvaluationReconciliationWorker({}).start()();
+});
+
+test("new arrivals cannot prevent sweep wrap and retry of earlier failures", async t => {
+  const f = fixture(t, RECONCILIATION_BATCH_SIZE);
+  f.failNext(1);
+  const worker = new EvaluationReconciliationWorker(makeDependencies());
+  await worker.tick();
+  const original = f.apps[0];
+  f.apps.push({ ...original, _id: new Types.ObjectId() });
+  await worker.tick();
+  assert.equal(f.records.size, RECONCILIATION_BATCH_SIZE * 2); // Earlier failure repaired before new arrival.
+  await worker.tick();
+  assert.equal(f.records.size, RECONCILIATION_BATCH_SIZE * 2 + 2);
 });
 
 test("production registration is disabled for development, test and incomplete production config", t => {

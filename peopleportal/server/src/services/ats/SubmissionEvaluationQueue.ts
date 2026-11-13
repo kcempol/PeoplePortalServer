@@ -4,17 +4,19 @@ import { SubteamConfig } from "../../models/SubteamConfig";
 import { PROMPT_VERSION, RUBRIC_VERSION } from "./ATSEvaluationEngine";
 import { productionEvaluationDependencies } from "./ATSEvaluationSetup";
 import { isEvaluationEnabled, scoringEvent, type EvaluationDependencies } from "./ATSEvaluationTypes";
+export type RoleConfigLookup = (subteamPk: string) => Promise<{ importantRequirementsByRole?: { role: string; text: string }[] } | null>;
 
 /** Called only after the application transaction commits. Never extracts or scores inline. */
 export async function queueSubmittedApplication(
     application: Pick<IApplication, "_id" | "applicantId" | "teamPk" | "rolePreferences">,
     deps: EvaluationDependencies = productionEvaluationDependencies(),
+    lookupConfig: RoleConfigLookup = subteamPk => SubteamConfig.findOne({ subteamPk }).exec(),
 ): Promise<void> {
     if (!isEvaluationEnabled(deps)) return;
 
     for (const preference of application.rolePreferences) {
         try {
-            const config = await SubteamConfig.findOne({ subteamPk: preference.subteamPk }).exec();
+            const config = await lookupConfig(preference.subteamPk);
             const requirements = config?.importantRequirementsByRole?.find(item => item.role === preference.role)?.text || "";
             // Repeated delivery cannot reset an existing score, attempt count or active lease.
             await AutomatedEvaluation.updateOne({

@@ -54,12 +54,12 @@ export function productionEvaluationDependencies(): EvaluationDependencies {
         }),
     };
 }
-export function startProductionEvaluationWorker(): () => void {
+export function startProductionEvaluationWorker(): () => Promise<void> {
     const deps = productionEvaluationDependencies();
-    return deps.enabled ? new ATSEvaluationWorker(deps).start() : () => {};
+    return deps.enabled ? new ATSEvaluationWorker(deps).start() : async () => {};
 }
 
-export function startProductionEvaluationReconciler(): () => void {
+export function startProductionEvaluationReconciler(): () => Promise<void> {
     const deps = productionEvaluationDependencies();
-    return deps.enabled ? new EvaluationReconciliationWorker(deps).start() : () => {};
+    return deps.enabled ? new EvaluationReconciliationWorker(deps).start() : async () => {};
 }
