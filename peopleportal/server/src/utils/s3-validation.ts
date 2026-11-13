@@ -108,14 +108,23 @@ export async function deleteTempAvatar(key: string): Promise<void> {
  * @returns Hex-encoded SHA-256 digest. Throws if the object cannot be read.
  */
 export async function getS3ObjectSha256(key: string): Promise<string> {
-    const { Body } = await s3Client.send(new GetObjectCommand({
+    const { Body, ContentLength, ContentType } = await s3Client.send(new GetObjectCommand({
         Bucket: BUCKET_NAME,
         Key: key
-    }));
+    }), { abortSignal: AbortSignal.timeout(15_000) });
 
-    if (!Body) throw new Error(`S3 object has no body: ${key}`);
-    const bytes = await Body.transformToByteArray();
-    return createHash("sha256").update(bytes).digest("hex");
+    if (!Body || ContentType !== "application/pdf" || !ContentLength || ContentLength > 10 * 1024 * 1024) throw new Error("Invalid snapshot metadata");
+    const hash = createHash("sha256");
+    let size = 0;
+    let header = Buffer.alloc(0);
+    for await (const chunk of Body as AsyncIterable<Uint8Array>) {
+        size += chunk.length;
+        if (size > ContentLength || size > 10 * 1024 * 1024) throw new Error("Snapshot size limit");
+        if (header.length < 5) header = Buffer.concat([header, Buffer.from(chunk)]).subarray(0, 5);
+        hash.update(chunk);
+    }
+    if (size !== ContentLength || header.toString("ascii") !== "%PDF-") throw new Error("Invalid snapshot PDF");
+    return hash.digest("hex");
 }
 
 /**
@@ -130,5 +139,5 @@ export async function copyS3Object(sourceKey: string, destinationKey: string): P
         Bucket: BUCKET_NAME,
         CopySource: `${BUCKET_NAME}/${sourceKey.split("/").map(encodeURIComponent).join("/")}`,
         Key: destinationKey
-    }));
+    }), { abortSignal: AbortSignal.timeout(15_000) });
 }

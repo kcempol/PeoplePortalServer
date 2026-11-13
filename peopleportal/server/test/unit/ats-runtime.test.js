@@ -9,8 +9,7 @@ const { ATSEvaluationWorker, mongoEvaluationQueue } = require("../../dist/servic
 const { AutomatedEvaluation } = require("../../dist/models/AutomatedEvaluation");
 const { Application } = require("../../dist/models/Application");
 const { SubteamConfig } = require("../../dist/models/SubteamConfig");
-const resume = "Built a React application with TypeScript, wrote accessibility tests, and reduced page load time by 30 percent through measured caching changes.";
-const result = score => ({ inferredJobFocus: "Software development", explanation: "Demonstrated relevant work.", categories: Object.keys(engine.CATEGORY_WEIGHTS).map(key => ({ key, score, explanation: "Demonstrated relevant work.", evidence: ["React application"] })) });
+const { resume, makeResult: result } = require("../helpers/ats-fixtures");
 
 test("production transport is mocked; strict schema and conservative spend boundary enforced", async () => {
   const config = { apiKey: "not-a-credential", model: "club-model", maxOutputTokens: 1000, maxCostUsdPerEvaluation: 1, totalBudgetUsd: 2, inputUsdPerMillion: 1, outputUsdPerMillion: 1 };
@@ -40,9 +39,9 @@ test("privacy boundary drops identity and protected lines and rejects prohibited
 });
 
 test("runtime cannot register live dependencies in normal development or tests", () => {
-  const { productionEvaluationDependencies } = require("../../dist/services/ats/ATSEvaluationRuntime");
+  const { productionEvaluationDependencies } = require("../../dist/services/ats/ATSEvaluationSetup");
   assert.deepEqual(productionEvaluationDependencies(), {});
-  const { readClubScoringConfig } = require("../../dist/services/ats/ATSEvaluationConfig");
+  const { readClubScoringConfig } = require("../../dist/services/ats/ATSEvaluationSetup");
   assert.equal(readClubScoringConfig({ ATS_AI_SCORING_ENABLED: "true", OPENAI_API_KEY: "not-a-credential", ATS_AI_MODEL: "club-model", ATS_AI_MAX_OUTPUT_TOKENS: "1000", ATS_AI_MAX_COST_USD_PER_EVALUATION: "1" }), null);
 });
 

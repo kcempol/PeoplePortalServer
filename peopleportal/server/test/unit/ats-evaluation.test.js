@@ -7,7 +7,7 @@ const { Application } = require("../../dist/models/Application");
 const { SubteamConfig } = require("../../dist/models/SubteamConfig");
 const { AutomatedEvaluation } = require("../../dist/models/AutomatedEvaluation");
 const { ATSEvaluationService } = require("../../dist/services/ats/ATSEvaluationService");
-const { readClubScoringConfig } = require("../../dist/services/ats/ATSEvaluationConfig");
+const { readClubScoringConfig } = require("../../dist/services/ats/ATSEvaluationSetup");
 const { MockScoringProvider, scoreExtractedResume, contentHash, isEvaluationStale, weightedScore } = require("../../dist/services/ats/ATSEvaluationEngine");
 
 const resume = "Built a React application with TypeScript, wrote accessibility tests, and reduced page load time by 30 percent through measured caching changes.";
