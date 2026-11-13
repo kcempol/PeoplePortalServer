@@ -1012,8 +1012,8 @@ export class ATSController extends Controller {
      * user needs to be a Team Owner or have the `corp:hiringaccess` bindle.
      * 
      * Information about the applicant will only be available if they applied
-     * to the team provided in the request.
-     * 
+     * to the team provided in the request; otherwise a 404 is returned.
+     *
      * @param teamId People Portal Team ID
      * @param applicantId Candidate's Applicant ID
      * @returns List of Other Applications
@@ -1024,12 +1024,19 @@ export class ATSController extends Controller {
     @Security("bindles", ["corp:hiringaccess"])
     async getApplicantApplications(@Path() teamId: string, @Path() applicantId: string) {
         try {
+            /* Only reveal an applicant's history to teams they applied to */
+            const appliedToTeam = Types.ObjectId.isValid(applicantId) &&
+                await Application.exists({ applicantId, teamPk: teamId });
+
+            if (!appliedToTeam) {
+                this.setStatus(404);
+                return { error: "NotFound", message: "Applicant not found" };
+            }
+
             const applications = await Application.find({ applicantId: applicantId })
                 .lean()
                 .sort({ appliedAt: -1 })
                 .exec();
-
-            /* verify applicant applied to this team (TODO) */
 
             const results = await Promise.all(applications.map(async (app: any) => {
                 let teamName = app.teamPk;
