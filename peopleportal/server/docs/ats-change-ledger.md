@@ -135,3 +135,14 @@ The final documentation-only commit adds this completed index. Roll back that HE
 first if desired, then `de22106`, `97bb452`, `73e6e15`, `b35e66f`, `83a11ba`,
 `68bb6b5`, stopping before base `a140102`.
 The checkpoint and teammate history are retained; nothing was pushed or deployed.
+
+## PR scope update: defer UI work
+
+The review branch was published as PR #2 targeting `feat/ats-ai-prescreen`.
+At the owner's request, a follow-up commit restores all four changed web UI files
+to base `a140102`. The PR therefore contains no net web UI changes. The earlier
+UI work and verification above remain historical checkpoints, recoverable from
+the preceding commits; the final reviewer interface will be decided separately.
+Server scoring, queueing, schema integration, and API behavior are unchanged by
+this scope update. Verification for this update checks exact web UI equality with
+the base, unchanged server source, and `git diff --check`; no live services run.

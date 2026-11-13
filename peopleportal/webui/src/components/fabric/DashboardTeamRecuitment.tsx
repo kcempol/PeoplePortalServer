@@ -1,4 +1,3 @@
-import { ExperimentalEvaluation } from "./ExperimentalEvaluation";
 /**
   People Portal UI
   Copyright (C) 2026  Atheesh Thirumalairajan
@@ -89,6 +88,112 @@ interface SubteamATSConfig {
     roleSpecificQuestions: { [key: string]: string[] };
     isRecruiting: boolean;
     importantRequirementsByRole?: { role: string; text: string }[];
+}
+
+interface ExperimentalEvaluationResult {
+    configured: boolean;
+    label: string;
+    evaluation: null | {
+        status: "queued" | "processing" | "scored" | "failed" | "stale";
+        overallScore?: number;
+        explanation?: string;
+        failureMessage?: string;
+        categories?: { key: string; score: number; explanation: string; evidence: string[] }[];
+    };
+}
+
+function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, refresh, onConfigured }: {
+    teamPk: string; applicationId: string;
+    preference: { role: string; subteamPk: string };
+    refresh: number; onConfigured: (configured: boolean) => void;
+}) {
+    const [result, setResult] = React.useState<ExperimentalEvaluationResult | null>(null);
+    const [busy, setBusy] = React.useState(false);
+    const [poll, setPoll] = React.useState(0);
+    const endpoint = `${PEOPLEPORTAL_SERVER_ENDPOINT}/api/ats/applications/${encodeURIComponent(teamPk)}/${encodeURIComponent(applicationId)}/evaluation`;
+    React.useEffect(() => {
+        setResult(null);
+    }, [applicationId]);
+    React.useEffect(() => {
+        let active = true;
+        const query = new URLSearchParams({ subteamPk: preference.subteamPk, jobTitle: preference.role });
+        fetch(`${endpoint}?${query}`, { credentials: "include" })
+            .then(async r => { if (!r.ok) throw new Error("Could not load the evaluation."); return r.json(); })
+            .then(data => { if (active) { setResult(data); onConfigured(data.configured); } })
+            .catch(() => { /* Preserve last status; an active job will retry on the next poll. */ });
+        return () => { active = false; };
+    }, [endpoint, preference.role, preference.subteamPk, refresh, onConfigured, poll]);
+    React.useEffect(() => {
+        if (result?.evaluation?.status !== "queued" && result?.evaluation?.status !== "processing") return;
+        const timer = window.setInterval(() => setPoll(value => value + 1), 3000);
+        return () => window.clearInterval(timer);
+    }, [result?.evaluation?.status]);
+    async function queue(retry: boolean) {
+        setBusy(true);
+        try {
+            const response = await fetch(`${endpoint}${retry ? "/retry" : ""}`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ subteamPk: preference.subteamPk, jobTitle: preference.role }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Could not queue evaluation.");
+            setResult(data);
+        } catch (error) { toast.error(error instanceof Error ? error.message : "Could not queue evaluation."); }
+        finally { setBusy(false); }
+    }
+    const evaluation = result?.evaluation;
+    return <div className="rounded border p-3 space-y-3" aria-label={`Evaluation for ${preference.role}`}>
+        <h5 className="font-medium">{preference.role}</h5>
+        <p className="text-xs text-muted-foreground">Experimental title-based score.</p>
+        {!result?.configured && <p className="text-sm text-muted-foreground">AI scoring cannot run until the club enables its server-side AI configuration.</p>}
+        {evaluation && <div className="space-y-2 text-sm">
+            <p>Status: <strong>{evaluation.status}</strong>{evaluation.overallScore !== undefined && ` · ${evaluation.overallScore}/100`}</p>
+            {evaluation.failureMessage && <p>{evaluation.failureMessage}</p>}
+            {evaluation.explanation && <p>{evaluation.explanation}</p>}
+            {evaluation.categories?.map(category => <div key={category.key} className="rounded bg-muted/50 p-2">
+                <strong>{{ skills: "Relevant skills and knowledge (35%)", projects: "Demonstrated projects or work (35%)", experience: "Relevant or transferable experience (20%)", outcomes: "Contributions and outcomes (10%)" }[category.key as "skills" | "projects" | "experience" | "outcomes"] || category.key}: {category.score}/100</strong><p>{category.explanation}</p>
+                {category.evidence.length > 0 && <ul className="list-disc pl-5">{category.evidence.map((item, i) => <li key={i}>{item}</li>)}</ul>}
+            </div>)}
+        </div>}
+        {result?.configured && <Button size="sm" disabled={busy || evaluation?.status === "queued" || evaluation?.status === "processing"}
+            onClick={() => queue(evaluation?.status === "failed")}>
+            {evaluation?.status === "failed" ? "Retry evaluation" : evaluation?.status === "stale" ? "Rescore résumé" : "Score résumé"}
+        </Button>}
+    </div>;
+}
+
+function ExperimentalEvaluation({ teamPk, applicationId, preferences }: {
+    teamPk: string; applicationId: string;
+    preferences: { role: string; subteamPk: string }[];
+}) {
+    const [configured, setConfigured] = React.useState(false);
+    const [busy, setBusy] = React.useState(false);
+    const [refresh, setRefresh] = React.useState(0);
+    const onConfigured = React.useCallback((value: boolean) => setConfigured(value), []);
+    async function queueAll() {
+        setBusy(true);
+        try {
+            const endpoint = `${PEOPLEPORTAL_SERVER_ENDPOINT}/api/ats/applications/${encodeURIComponent(teamPk)}/${encodeURIComponent(applicationId)}/evaluation`;
+            const response = await fetch(`${endpoint}/all`, { method: "POST", credentials: "include" });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Could not queue evaluations.");
+            if (data.results.some((item: { result: { error?: string } }) => item.result.error))
+                throw new Error("Some job evaluations could not be queued. Review the individual job panels.");
+            setRefresh(value => value + 1);
+            toast.success("Evaluations queued for all applied job titles.");
+        } catch (error) {
+            setRefresh(value => value + 1);
+            toast.error(error instanceof Error ? error.message : "Could not queue all evaluations.");
+        } finally { setBusy(false); }
+    }
+    return <section className="space-y-3" aria-label="Experimental AI evaluations">
+        <div><h4 className="font-medium">Experimental title-based scores.</h4>
+            <p className="text-xs text-muted-foreground">A separate résumé evaluation for every job title on this application. Scores never change application stages or human feedback.</p></div>
+        {configured && <Button size="sm" disabled={busy} onClick={queueAll}>Score résumé for all applied jobs</Button>}
+        {preferences.map(preference => <ExperimentalRoleEvaluation key={`${applicationId}:${preference.subteamPk}:${preference.role}`}
+            teamPk={teamPk} applicationId={applicationId} preference={preference} refresh={refresh} onConfigured={onConfigured} />)}
+    </section>;
 }
 
 // Lite object for Kanban
