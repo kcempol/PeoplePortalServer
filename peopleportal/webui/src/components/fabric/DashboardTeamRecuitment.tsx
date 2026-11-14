@@ -79,6 +79,7 @@ import { Textarea } from "../ui/textarea";
 import { Timeline, TimelineItem } from "../ui/timeline";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import Ratings from "../ui/ratings";
+import { ResumeScoreRing } from "../ui/resume-score-ring";
 import { Editor } from "@/components/blocks/editor-00/editor";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -102,32 +103,36 @@ interface ExperimentalEvaluationResult {
     };
 }
 
-function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, refresh, onConfigured }: {
+function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, index, refresh, onConfigured }: {
     teamPk: string; applicationId: string;
     preference: { role: string; subteamPk: string };
+    index: number;
     refresh: number; onConfigured: (configured: boolean) => void;
 }) {
     const [result, setResult] = React.useState<ExperimentalEvaluationResult | null>(null);
     const [busy, setBusy] = React.useState(false);
     const [poll, setPoll] = React.useState(0);
+    const [loadError, setLoadError] = React.useState(false);
     const endpoint = `${PEOPLEPORTAL_SERVER_ENDPOINT}/api/ats/applications/${encodeURIComponent(teamPk)}/${encodeURIComponent(applicationId)}/evaluation`;
     React.useEffect(() => {
         setResult(null);
     }, [applicationId]);
     React.useEffect(() => {
         let active = true;
+        const controller = new AbortController();
         const query = new URLSearchParams({ subteamPk: preference.subteamPk, jobTitle: preference.role });
-        fetch(`${endpoint}?${query}`, { credentials: "include" })
+        fetch(`${endpoint}?${query}`, { credentials: "include", signal: controller.signal })
             .then(async r => { if (!r.ok) throw new Error("Could not load the evaluation."); return r.json(); })
-            .then(data => { if (active) { setResult(data); onConfigured(data.configured); } })
-            .catch(() => { /* Preserve last status; an active job will retry on the next poll. */ });
-        return () => { active = false; };
+            .then(data => { if (active) { setResult(data); setLoadError(false); onConfigured(data.configured); } })
+            .catch(() => { if (active) setLoadError(true); });
+        return () => { active = false; controller.abort(); };
     }, [endpoint, preference.role, preference.subteamPk, refresh, onConfigured, poll]);
     React.useEffect(() => {
-        if (result?.evaluation?.status !== "queued" && result?.evaluation?.status !== "processing") return;
+        // Stop automatic polling after five minutes; reopening the application starts a new window.
+        if (poll >= 100 || (result?.evaluation?.status !== "queued" && result?.evaluation?.status !== "processing")) return;
         const timer = window.setInterval(() => setPoll(value => value + 1), 3000);
         return () => window.clearInterval(timer);
-    }, [result?.evaluation?.status]);
+    }, [result?.evaluation?.status, poll]);
     async function queue(retry: boolean) {
         setBusy(true);
         try {
@@ -139,16 +144,27 @@ function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, refresh
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || "Could not queue evaluation.");
             setResult(data);
+            setLoadError(false);
+            setPoll(0);
         } catch (error) { toast.error(error instanceof Error ? error.message : "Could not queue evaluation."); }
         finally { setBusy(false); }
     }
     const evaluation = result?.evaluation;
-    return <div className="rounded border p-3 space-y-3" aria-label={`Evaluation for ${preference.role}`}>
-        <h5 className="font-medium">{preference.role}</h5>
-        <p className="text-xs text-muted-foreground">Experimental title-based score.</p>
-        {!result?.configured && <p className="text-sm text-muted-foreground">AI scoring cannot run until the club enables its server-side AI configuration.</p>}
+    return <details className="rounded border border-border bg-muted/50" aria-label={`Evaluation for ${preference.role}`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded p-3 focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+            <span className="flex min-w-0 items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">#{index + 1}</span>
+                <span className="text-xs font-medium text-foreground">{preference.role}</span>
+            </span>
+            <ResumeScoreRing role={preference.role} score={evaluation?.overallScore} status={evaluation?.status}
+                loading={!result && !loadError} error={loadError} />
+        </summary>
+        <div className="space-y-3 border-t p-3">
+        <p className="text-xs text-muted-foreground">LLM score</p>
+        {loadError && <p className="text-sm text-muted-foreground">Could not load the current score. Close and reopen this application to try again.</p>}
+        {result && !result.configured && <p className="text-sm text-muted-foreground">AI scoring cannot run until the club enables its server-side AI configuration.</p>}
         {evaluation && <div className="space-y-2 text-sm">
-            <p>Status: <strong>{evaluation.status}</strong>{evaluation.overallScore !== undefined && ` · ${evaluation.overallScore}/100`}</p>
+            <p>Status: <strong>{evaluation.status}</strong></p>
             {evaluation.failureMessage && <p>{evaluation.failureMessage}</p>}
             {evaluation.explanation && <p>{evaluation.explanation}</p>}
             {evaluation.categories?.map(category => <div key={category.key} className="rounded bg-muted/50 p-2">
@@ -160,7 +176,8 @@ function ExperimentalRoleEvaluation({ teamPk, applicationId, preference, refresh
             onClick={() => queue(evaluation?.status === "failed")}>
             {evaluation?.status === "failed" ? "Retry evaluation" : evaluation?.status === "stale" ? "Rescore résumé" : "Score résumé"}
         </Button>}
-    </div>;
+        </div>
+    </details>;
 }
 
 function ExperimentalEvaluation({ teamPk, applicationId, preferences }: {
@@ -187,12 +204,12 @@ function ExperimentalEvaluation({ teamPk, applicationId, preferences }: {
             toast.error(error instanceof Error ? error.message : "Could not queue all evaluations.");
         } finally { setBusy(false); }
     }
-    return <section className="space-y-3" aria-label="Experimental AI evaluations">
-        <div><h4 className="font-medium">Experimental title-based scores.</h4>
-            <p className="text-xs text-muted-foreground">A separate résumé evaluation for every job title on this application. Scores never change application stages or human feedback.</p></div>
+    return <section className="space-y-2" aria-label="Roles in order of preference">
+        <div><h4 className="text-md text-muted-foreground">Roles in Order of Preference</h4>
+            <p className="text-xs text-muted-foreground">Ranked by applicant · ring shows ATS resume match (0–100)</p></div>
+        {preferences.map((preference, index) => <ExperimentalRoleEvaluation key={`${teamPk}:${applicationId}:${preference.subteamPk}:${preference.role}`}
+            teamPk={teamPk} applicationId={applicationId} preference={preference} index={index} refresh={refresh} onConfigured={onConfigured} />)}
         {configured && <Button size="sm" disabled={busy} onClick={queueAll}>Score résumé for all applied jobs</Button>}
-        {preferences.map(preference => <ExperimentalRoleEvaluation key={`${applicationId}:${preference.subteamPk}:${preference.role}`}
-            teamPk={teamPk} applicationId={applicationId} preference={preference} refresh={refresh} onConfigured={onConfigured} />)}
     </section>;
 }
 
@@ -633,6 +650,7 @@ export const DashboardTeamRecruitment = () => {
     }
 
     React.useEffect(() => {
+        let active = true;
         if (selectedApplication?.applicantId) {
             setApplicantUrls(null); // Reset while loading
             setOtherApplications([]); // Reset while loading
@@ -641,7 +659,7 @@ export const DashboardTeamRecruitment = () => {
 
             // Fetch secure resume URL
             fetch(
-                `${PEOPLEPORTAL_SERVER_ENDPOINT}/api/ats/applications/${params.teamId}/${selectedApplication.applicantId}/resume`,
+                `${PEOPLEPORTAL_SERVER_ENDPOINT}/api/ats/applications/${params.teamId}/${selectedApplication.id}/resume`,
             )
                 .then(async (res) => {
                     if (!res.ok) {
@@ -651,9 +669,10 @@ export const DashboardTeamRecruitment = () => {
                         );
                     }
                     const urls = await res.json();
-                    setApplicantUrls(urls);
+                    if (active) setApplicantUrls(urls);
                 })
                 .catch((err) => {
+                    if (!active) return;
                     console.error("Failed to fetch applicant URLs", err);
                     toast.error("Failed to load resume: " + err.message);
                 });
@@ -671,9 +690,10 @@ export const DashboardTeamRecruitment = () => {
                         );
                     }
                     const apps = await res.json();
-                    setOtherApplications(apps);
+                    if (active) setOtherApplications(apps);
                 })
                 .catch((err) => {
+                    if (!active) return;
                     console.error("Failed to fetch applicant history", err);
                     toast.error(
                         "Failed to load applicant history: " + err.message,
@@ -692,17 +712,19 @@ export const DashboardTeamRecruitment = () => {
                         );
                     }
                     const details: KanbanApplicationDetails = await res.json();
-                    setSelectedApplicationDetails(details);
+                    if (active) setSelectedApplicationDetails(details);
                 })
                 .catch((err) => {
+                    if (!active) return;
                     console.error("Failed to fetch application details", err);
                     toast.error(
                         "Failed to load application details: " + err.message,
                     );
                 })
-                .finally(() => setIsLoadingDetails(false));
+                .finally(() => { if (active) setIsLoadingDetails(false); });
         }
-    }, [selectedApplication?.id]);
+        return () => { active = false; };
+    }, [selectedApplication?.id, params.teamId]);
 
     // Fetch application stages
     React.useEffect(() => {
@@ -1489,35 +1511,8 @@ export const DashboardTeamRecruitment = () => {
                                     </Alert>
                                 )}
 
-                                {/* Subteam Preferences */}
-                                <div>
-                                    <h4 className="text-md text-muted-foreground mb-2">
-                                        Roles in Order of Preference
-                                    </h4>
-                                    <div className="flex flex-col gap-2">
-                                        {selectedApplicationDetails?.rolePreferences?.map(
-                                            (pref, idx) => {
-                                                return (
-                                                    <div
-                                                        key={idx}
-                                                        className="bg-muted/50 p-2 rounded border border-border"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                                                #{idx + 1}
-                                                            </span>
-                                                            <span className="text-xs font-medium text-foreground">
-                                                                {pref.role}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            },
-                                        )}
-                                    </div>
-                                </div>
-
                                 {params.teamId && <ExperimentalEvaluation
+                                    key={`${params.teamId}:${selectedApplicationDetails.id}`}
                                     teamPk={params.teamId} applicationId={selectedApplicationDetails.id}
                                     preferences={selectedApplicationDetails.rolePreferences} />}
 
